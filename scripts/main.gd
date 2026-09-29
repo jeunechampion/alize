@@ -3,6 +3,7 @@ extends Node3D
 
 var generator: IslandGenerator
 var island: Island
+var vegetation: Vegetation
 var ocean: Ocean
 var sky: SkyDome
 var wind: WindField
@@ -41,7 +42,7 @@ func _ready() -> void:
 
 func build_world(seed_value: int) -> void:
 	var t0 := Time.get_ticks_msec()
-	for c in [island, ocean, sky, bird, cam, hud, wind_audio]:
+	for c in [island, vegetation, ocean, sky, bird, cam, hud, wind_audio]:
 		if c:
 			c.queue_free()
 	for tv in thermal_visuals:
@@ -57,6 +58,11 @@ func build_world(seed_value: int) -> void:
 	add_child(island)
 	island.build(generator)
 	var t2 := Time.get_ticks_msec()
+
+	vegetation = Vegetation.new()
+	vegetation.name = "Vegetation"
+	add_child(vegetation)
+	vegetation.build(generator, seed_value, Vector2(-1.0, 0.25))
 
 	ocean = Ocean.new()
 	ocean.name = "Ocean"

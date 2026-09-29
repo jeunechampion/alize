@@ -25,6 +25,42 @@ func _ready() -> void:
 	cam.look_at(Vector3.ZERO)
 	var mesh := MeshInstance3D.new()
 	mesh.mesh = SphereMesh.new()
+	if mode >= 11:
+		var trng := RandomNumberGenerator.new()
+		trng.seed = 5
+		mesh.mesh = TreeBuilder.build_broadleaf(trng, 9.0, 4.5)
+		mesh.position = Vector3(0, -4.5, 0)
+		mesh.scale = Vector3.ONE * 0.35
+		cam.position = Vector3(0, 0.5, 7)
+		cam.look_at(Vector3(0, 0, 0))
+		if mode == 13 or mode == 14 or mode == 15:
+			var mm := MultiMesh.new()
+			mm.transform_format = MultiMesh.TRANSFORM_3D
+			mm.use_custom_data = (mode == 13 or mode == 15)
+			mm.use_colors = (mode == 15)
+			mm.mesh = mesh.mesh
+			mm.instance_count = 1
+			mm.set_instance_transform(0, Transform3D(Basis.IDENTITY.scaled(Vector3.ONE * 0.35), Vector3(0, -4.5, 0)))
+			if mode == 13 or mode == 15:
+				mm.set_instance_custom_data(0, Color(1.0, 9.0, 0.0, 0.0))
+			if mode == 15:
+				mm.set_instance_color(0, Color(1, 1, 1, 1))
+			var mmi := MultiMeshInstance3D.new()
+			mmi.multimesh = mm
+			var vm2 := ShaderMaterial.new()
+			vm2.shader = load("res://shaders/vegetation.gdshader")
+			mmi.material_override = vm2
+			add_child(mmi)
+			mesh.visible = false
+		if mode == 11:
+			var vm := ShaderMaterial.new()
+			vm.shader = load("res://shaders/vegetation.gdshader")
+			mesh.material_override = vm
+		else:
+			var sm2 := StandardMaterial3D.new()
+			sm2.vertex_color_use_as_albedo = true
+			sm2.cull_mode = BaseMaterial3D.CULL_DISABLED
+			mesh.material_override = sm2
 	var mat := StandardMaterial3D.new()
 	mat.albedo_color = Color(0.16, 0.52, 0.22)
 	mesh.material_override = mat
@@ -47,5 +83,7 @@ func _process(_d: float) -> void:
 		print("MODE ", mode, " amb=", e.ambient_light_color, " energy=", e.ambient_light_energy, " src=", e.ambient_light_source, " mix=", e.ambient_light_sky_contribution)
 	if frames == 10:
 		var img := get_viewport().get_texture().get_image()
-		print("MODE ", mode, " lit ", img.get_pixel(760, 330), " dark ", img.get_pixel(520, 330), " center ", img.get_pixel(640, 360))
+		print("MODE ", mode, " lit ", img.get_pixel(760, 330), " dark ", img.get_pixel(520, 330), " center ", img.get_pixel(640, 360), " up ", img.get_pixel(640, 250))
+		if mode >= 11:
+			img.save_png("/home/claude/shotq/probe_%d.png" % mode)
 		get_tree().quit()

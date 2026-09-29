@@ -25,8 +25,8 @@ func setup() -> void:
 	sun.directional_shadow_split_2 = 0.18
 	sun.directional_shadow_split_3 = 0.45
 	sun.directional_shadow_fade_start = 0.85
-	sun.shadow_bias = 0.05
-	sun.shadow_normal_bias = 1.5
+	sun.shadow_bias = 0.08
+	sun.shadow_normal_bias = 3.0
 	sun.light_angular_distance = 0.6
 	sun.light_energy = 1.3
 	add_child(sun)
