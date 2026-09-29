@@ -16,6 +16,7 @@ var _climb_start := {}
 var _max_speed := 0.0
 var _dive_max_speed := 0.0
 var _turn_start_heading := 0.0
+var _turn_max_bank := 0.0
 var _turn_time := -1.0
 var _shot_pending := false
 var _first_person_done := false
@@ -31,6 +32,7 @@ func start(p_main: Node) -> void:
 	report["seed"] = Game.seed_text
 	report["island"] = main.generator.stats()
 	report["island_fingerprint"] = main.generator.fingerprint()
+	report["island_fingerprint_coarse"] = main.generator.fingerprint_coarse()
 	report["model"] = {
 		"best_glide_ratio_theory": bird.model.best_glide_ratio(),
 		"stall_speed_theory": bird.model.stall_speed(),
@@ -56,11 +58,11 @@ func _physics_process(_dt: float) -> void:
 		m.aim_yaw = main.spawn_heading
 		m.aim_pitch = 0.0
 		if tick == 60:
-			_shoot("01_depart")
 			if Game.shot_only:
-				await get_tree().create_timer(0.1).timeout
+				await _shoot("01_depart")
 				_finish()
 				return
+			_shoot("01_depart")
 	elif t < 13.5:
 		_set_phase("plané rectiligne")
 		m.aim_pitch = deg_to_rad(-4.0)
@@ -82,9 +84,10 @@ func _physics_process(_dt: float) -> void:
 			_turn_start_heading = m.heading
 			m.aim_yaw = wrapf(m.heading + deg_to_rad(110.0), -PI, PI)
 		m.aim_pitch = deg_to_rad(-3.0)
+		_turn_max_bank = maxf(_turn_max_bank, absf(m.bank))
 		if _turn_time < 0.0 and absf(wrapf(m.heading - _turn_start_heading, -PI, PI)) > deg_to_rad(100.0):
 			_turn_time = t - 13.5
-			report["turn"] = {"time_for_100deg_s": _turn_time, "max_bank_deg": rad_to_deg(m.bank), "speed_ms": m.velocity.length()}
+			report["turn"] = {"time_for_100deg_s": _turn_time, "max_bank_deg": rad_to_deg(_turn_max_bank), "speed_ms": m.velocity.length()}
 		if tick == 1020:
 			_shoot("02_virage")
 	elif t < 29.0:

@@ -80,6 +80,11 @@ func _process(dt: float) -> void:
 		_look_offset = _look_offset.lerp(target_look_offset, k_look)
 	var _pos := bird.global_position + _offset
 	var _look := bird.global_position + _look_offset
+	# Le décalage lissé ne doit jamais mettre la caméra sous le sol ni sous l'eau.
+	var floor_now: float = maxf(bird.generator.height_at(_pos.x, _pos.z) + 0.6, IslandGenerator.SEA_LEVEL + 1.2)
+	if _pos.y < floor_now:
+		_pos.y = floor_now
+		_offset = _pos - bird.global_position
 
 	var speed := m.velocity.length() if flying else 0.0
 	var target_fov := 72.0 + clampf((speed - 10.0) * 0.9, 0.0, 22.0)

@@ -61,7 +61,7 @@ func build_world(seed_value: int) -> void:
 	ocean = Ocean.new()
 	ocean.name = "Ocean"
 	add_child(ocean)
-	ocean.setup(island.height_texture)
+	ocean.setup(island.height_texture, generator)
 
 	sky = SkyDome.new()
 	sky.name = "Sky"
@@ -146,7 +146,11 @@ func _place_thermals() -> void:
 		thermal_visuals.append(tv)
 
 
+var _respawn_serial := 0
+
+
 func respawn() -> void:
+	_respawn_serial += 1
 	bird.spawn(spawn_pos, spawn_heading, 13.0)
 	cam.snap()
 
@@ -154,8 +158,10 @@ func respawn() -> void:
 func _on_bird_crashed(hard: bool) -> void:
 	if hard:
 		hud.flash("Trop vite... L'oiseau se réveille au point de départ.", 4.0)
+		var serial := _respawn_serial
 		await get_tree().create_timer(2.0).timeout
-		respawn()
+		if serial == _respawn_serial:   # pas de double réapparition si R a déjà été pressé
+			respawn()
 	else:
 		hud.flash("Aïe.", 1.5)
 

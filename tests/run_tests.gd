@@ -17,7 +17,19 @@ func check(cond: bool, what: String) -> void:
 		print("  FAIL ", what)
 
 
-func _init() -> void:
+var _done := false
+
+
+## Les nœuds (oiseau, océan) ont besoin d'un arbre de scène prêt : on lance tout à la première image.
+func _process(_delta: float) -> bool:
+	if _done:
+		return true
+	_done = true
+	run_all()
+	return true
+
+
+func run_all() -> void:
 	print("== Générateur d'île ==")
 	var t0 := Time.get_ticks_msec()
 	var g1 := IslandGenerator.new(GameScript.seed_from_text("alize"))
@@ -142,5 +154,75 @@ func _init() -> void:
 	# multiple, absente ici, l'éclaircirait encore ; à faire dans l'étape ciel).
 	check(lum.call(hz_noon) > 0.8 * lum.call(zen_noon), "l'horizon de midi n'est pas plus sombre que le zénith")
 
+	print("== Océan ==")
+	var ocean := Ocean.new()
+	get_root().add_child(ocean)
+	ocean.setup(ImageTexture.create_from_image(g1.make_height_image()), g1)
+	var center: Vector2 = g1.params.center
+	var dir := Vector2(1.0, 0.0)
+	var coast := center
+	for i in 400:
+		coast += dir * 10.0
+		if g1.height_at(coast.x, coast.y) < IslandGenerator.SEA_LEVEL:
+			break
+	var lagoon := coast + dir * 60.0
+	var lo := 1e9
+	var hi := -1e9
+	for i in 240:
+		var hgt := ocean.surface_height(lagoon.x, lagoon.y, i * 0.1)
+		lo = minf(lo, hgt)
+		hi = maxf(hi, hgt)
+	print("  lagon (fond %.1f m) : vagues de %.2f m crête à creux" % [g1.height_at(lagoon.x, lagoon.y), hi - lo])
+	check(hi - lo < 0.9, "le lagon est calme (amortissement par la profondeur)")
+	lo = 1e9
+	hi = -1e9
+	for i in 240:
+		var hgt := ocean.surface_height(-2400.0, 300.0, i * 0.1)
+		lo = minf(lo, hgt)
+		hi = maxf(hi, hgt)
+	print("  grand large : vagues de %.2f m crête à creux" % (hi - lo))
+	check(hi - lo > 1.5 and hi - lo < 3.2, "la houle du large fait entre 1,5 et 3,2 m")
+
+	print("== Décollage ==")
+	var wf := WindField.new(g1)
+	var bird := Bird.new()
+	get_root().add_child(bird)
+	bird.setup(wf, g1, ocean)
+	bird.input_enabled = false
+	var crashes := 0
+	bird.crashed.connect(func(_hard: bool): crashes += 1)
+	var beach := coast - dir * 25.0
+	var bh := g1.height_at(beach.x, beach.y)
+	print("  plage à h = %.2f m, vent %s" % [bh, wf.base_wind])
+	bird.spawn(Vector3(beach.x, bh + 0.22, beach.y), FlightModel.heading_of(Vector3(wf.base_wind.x, 0.0, wf.base_wind.z)), 0.0)
+	bird._land()
+	check(bird.state == Bird.State.LANDED, "posé sur la plage, face au vent arrière")
+	bird.model.flapping = true
+	bird.model.aim_pitch = 0.0
+	for i in 360:
+		bird.model.aim_yaw = bird.model.heading   # le joueur ne tire pas sur la visée
+		bird._physics_process(dt)
+	print("  après 6 s : état %s, altitude %.1f m, %d crash(s)" % [bird.state_name(), bird.model.position.y - bh, crashes])
+	check(bird.state == Bird.State.FLYING, "décollage vent arrière depuis la plage : en vol")
+	check(crashes == 0, "décollage sans crash")
+	# Depuis l'eau.
+	bird.model.flapping = false
+	var sea_pt := coast + dir * 250.0
+	print("  point en mer : fond à %.1f m" % g1.height_at(sea_pt.x, sea_pt.y))
+	bird.spawn(Vector3(sea_pt.x, 0.3, sea_pt.y), 0.0, 3.0)
+	bird.model.velocity = Vector3(0, -1.0, 0)
+	for i in 30:
+		bird._physics_process(dt)
+	check(bird.state == Bird.State.ON_WATER, "un contact lent avec la mer : à l'eau (%s)" % bird.state_name())
+	crashes = 0
+	bird.model.flapping = true
+	for i in 360:
+		bird.model.aim_yaw = bird.model.heading
+		bird._physics_process(dt)
+	check(bird.state == Bird.State.FLYING and crashes == 0, "décollage depuis l'eau sans crash (%s, %d)" % [bird.state_name(), crashes])
+	bird.queue_free()
+	ocean.queue_free()
+
 	print("\n%d vérifications, %d échec(s)" % [checks, failures])
 	quit(1 if failures > 0 else 0)
+

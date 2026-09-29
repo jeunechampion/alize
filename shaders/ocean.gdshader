@@ -7,6 +7,7 @@ render_mode cull_disabled, depth_draw_always, diffuse_burley, specular_schlick_g
 uniform sampler2D height_tex : filter_linear, repeat_disable;
 uniform sampler2D detail_noise : filter_linear_mipmap, repeat_enable;
 uniform float extent = 5000.0;
+uniform float tex_size = 641.0;
 uniform float sea_level = 0.0;
 uniform float deep_sea = -160.0;
 
@@ -24,7 +25,7 @@ varying vec3 wpos;
 varying float wave_h;
 varying vec3 wnorm;
 
-const float MAX_AMP = 1.62;
+const float MAX_AMP = 1.52;
 
 vec3 gerstner(vec2 p, float t, vec2 d, float L, float A, float Q) {
 	float k = 6.2831853 / L;
@@ -33,17 +34,23 @@ vec3 gerstner(vec2 p, float t, vec2 d, float L, float A, float Q) {
 	return vec3(Q * A * d.x * cos(f), A * sin(f), Q * A * d.y * cos(f));
 }
 
+// Trois trains de houle (le train court de 13 m est laissé aux vaguelettes du fragment :
+// la maille de 10 m ne le résoudrait pas). Même fonction dans ocean.gd (surface_height).
 vec3 displace(vec2 p, float t, float s) {
 	vec2 w = normalize(wind_dir);
 	vec2 w2 = normalize(w + vec2(-w.y, w.x) * 0.45);
 	vec2 w3 = normalize(w + vec2(w.y, -w.x) * 0.6);
-	vec2 w4 = normalize(w + vec2(-w.y, w.x) * 1.1);
 	vec3 o = vec3(0.0);
 	o += gerstner(p, t, w, 110.0, 0.85 * s, 0.35);
 	o += gerstner(p, t, w2, 55.0, 0.45 * s, 0.45);
 	o += gerstner(p, t, w3, 26.0, 0.22 * s, 0.5);
-	o += gerstner(p, t, w4, 13.0, 0.10 * s, 0.5);
 	return o;
+}
+
+// Coordonnée de lecture du champ de hauteurs : l'échantillon i est à x = -extent/2 + i·extent/(n-1),
+// donc on vise le centre des texels (sinon décalage d'un demi-texel, soit 4 m).
+vec2 height_uv(vec2 p) {
+	return (p / extent + 0.5) * (tex_size - 1.0) / tex_size + 0.5 / tex_size;
 }
 
 void vertex() {
@@ -52,27 +59,33 @@ void vertex() {
 	float s = wave_scale * (1.0 - smoothstep(fade_start, fade_end, dist));
 	vec2 p = VERTEX.xz;
 	// Les vagues s'amortissent dans les eaux peu profondes : le lagon est calme, la houle brise au récif.
-	vec2 uv0 = p / extent + 0.5;
+	vec2 uv0 = height_uv(p);
 	float inside0 = step(0.0, uv0.x) * step(uv0.x, 1.0) * step(0.0, uv0.y) * step(uv0.y, 1.0);
 	float terr0 = mix(deep_sea, textureLod(height_tex, clamp(uv0, vec2(0.0), vec2(1.0)), 0.0).r, inside0);
 	float depth0 = max(sea_level - terr0, 0.0);
 	s *= mix(0.2, 1.0, smoothstep(1.5, 22.0, depth0));
-	vec3 d = displace(p, t, s);
-	float e = 1.5;
-	vec3 dx = displace(p + vec2(e, 0.0), t, s) - displace(p - vec2(e, 0.0), t, s);
-	vec3 dz = displace(p + vec2(0.0, e), t, s) - displace(p - vec2(0.0, e), t, s);
-	vec3 tx = vec3(2.0 * e, 0.0, 0.0) + dx;
-	vec3 tz = vec3(0.0, 0.0, 2.0 * e) + dz;
-	wnorm = normalize(cross(tz, tx));
-	VERTEX += d;
+	if (s < 0.001) {
+		// Plan lointain ou eau très peu profonde : surface plate.
+		wnorm = vec3(0.0, 1.0, 0.0);
+		wave_h = 0.0;
+	} else {
+		vec3 d = displace(p, t, s);
+		float e = 1.5;
+		vec3 dx = displace(p + vec2(e, 0.0), t, s) - displace(p - vec2(e, 0.0), t, s);
+		vec3 dz = displace(p + vec2(0.0, e), t, s) - displace(p - vec2(0.0, e), t, s);
+		vec3 tx = vec3(2.0 * e, 0.0, 0.0) + dx;
+		vec3 tz = vec3(0.0, 0.0, 2.0 * e) + dz;
+		wnorm = normalize(cross(tz, tx));
+		VERTEX += d;
+		wave_h = d.y / max(MAX_AMP * wave_scale, 0.001);
+	}
 	NORMAL = wnorm;
 	wpos = VERTEX;
-	wave_h = d.y / max(MAX_AMP * wave_scale, 0.001);
 }
 
 void fragment() {
 	// Profondeur d'eau réelle sous ce point, à partir du relief de l'île.
-	vec2 uv = wpos.xz / extent + 0.5;
+	vec2 uv = height_uv(wpos.xz);
 	float inside = step(0.0, uv.x) * step(uv.x, 1.0) * step(0.0, uv.y) * step(uv.y, 1.0);
 	float terr = mix(deep_sea, texture(height_tex, clamp(uv, vec2(0.0), vec2(1.0))).r, inside);
 	float border = max(abs(uv.x - 0.5), abs(uv.y - 0.5)) * 2.0;

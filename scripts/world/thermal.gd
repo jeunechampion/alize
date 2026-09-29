@@ -36,6 +36,7 @@ func sample(pos: Vector3, wind: Vector3) -> Vector3:
 	if r <= 1.0:
 		prof = 1.0 - r * r
 	else:
-		prof = -0.18 * (1.0 - smoothstep(1.0, 1.5, r))
+		# Couronne descendante, continue en r = 1 (0), maximale vers r = 1.15, nulle en r = 1.5.
+		prof = -0.18 * smoothstep(1.0, 1.15, r) * (1.0 - smoothstep(1.15, 1.5, r))
 	var hz := smoothstep(base_y - 20.0, base_y + 80.0, pos.y) * (1.0 - smoothstep(top - 200.0, top, pos.y))
 	return Vector3(0.0, core * prof * hz, 0.0)

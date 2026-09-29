@@ -94,8 +94,9 @@ func height_function(x: float, z: float) -> float:
 	var coast := _n_coast.get_noise_2d(wx, wz)          # [-1, 1]
 	var rw := r * (1.0 + _coast_warp * coast)            # rayon déformé : le trait de côte
 
-	# Masque terre : 1 au centre, 0 à la côte (rw = 1).
+	# Masque terre : 1 au centre, 0 à la côte (rw = 1) ; jamais de terre près du bord du champ.
 	var land := 1.0 - smoothstep(0.78, 1.0, rw)
+	land *= 1.0 - smoothstep(2100.0, 2350.0, Vector2(x, z).length())
 
 	# Poids radial pour la montagne centrale (0 à la côte, 1 au centre).
 	var mfac: float = clampf((1.0 - rw) / 0.85, 0.0, 1.0)
@@ -199,7 +200,16 @@ func make_height_image() -> Image:
 	return Image.create_from_data(SIZE, SIZE, false, Image.FORMAT_RF, heights.to_byte_array())
 
 
-## Empreinte du relief (pour vérifier le déterminisme entre machines).
+## Empreinte tolérante (arrondie) : comparable entre machines même si un bit de bruit diffère.
+func fingerprint_coarse() -> String:
+	var s: Dictionary = stats()
+	var sum := 0.0
+	for h in heights:
+		sum += h
+	return "%.4f|%.1f|%.1f|%.0f" % [s.land_fraction, s.max_height, s.min_height, sum / 1000.0]
+
+
+## Empreinte exacte du relief (déterminisme sur une même machine).
 func fingerprint() -> String:
 	return String.num_uint64(_hash_heights())
 
