@@ -22,6 +22,7 @@ var mat_white: StandardMaterial3D
 var mat_dark: StandardMaterial3D
 var mat_beak: StandardMaterial3D
 var mat_feet: StandardMaterial3D
+var mat_wing: StandardMaterial3D
 
 
 static func _mat(color: Color, rough: float = 0.85) -> StandardMaterial3D:
@@ -47,6 +48,9 @@ func build() -> void:
 	mat_dark = _mat(Color(0.12, 0.11, 0.11))
 	mat_beak = _mat(Color(0.62, 0.74, 0.82), 0.5)
 	mat_feet = _mat(Color(0.88, 0.22, 0.18), 0.6)
+	mat_wing = _mat(Color.WHITE, 0.8)
+	mat_wing.vertex_color_use_as_albedo = true
+	mat_wing.cull_mode = BaseMaterial3D.CULL_BACK
 
 	# Corps : ellipsoïde allongé selon -Z.
 	var body_mesh := SphereMesh.new()
@@ -97,8 +101,10 @@ func build() -> void:
 	tail = Node3D.new()
 	tail.position = Vector3(0.0, 0.0, 0.16)
 	add_child(tail)
-	_box(Vector3(0.075, 0.008, 0.13), Vector3(0.0, 0.0, 0.06), mat_white, tail)
-	_box(Vector3(0.06, 0.009, 0.035), Vector3(0.0, 0.0, 0.115), mat_dark, tail)
+	var tail_mi := MeshInstance3D.new()
+	tail_mi.mesh = _tail_surface()
+	tail_mi.material_override = mat_wing
+	tail.add_child(tail_mi)
 
 	# Ailes : pivot d'épaule -> aile interne -> pivot de coude -> aile externe.
 	wing_l = _make_wing(-1.0)
@@ -113,23 +119,116 @@ func _make_wing(side: float) -> Node3D:
 	var shoulder := Node3D.new()
 	shoulder.position = Vector3(side * 0.045, 0.03, -0.02)
 	add_child(shoulder)
-	# Aile interne (bras) : blanche, bord de fuite sombre.
-	_box(Vector3(0.24, 0.012, 0.15), Vector3(side * 0.12, 0.0, 0.0), mat_white, shoulder)
-	_box(Vector3(0.24, 0.004, 0.04), Vector3(side * 0.12, 0.0075, 0.058), mat_dark, shoulder)
-	_box(Vector3(0.24, 0.004, 0.04), Vector3(side * 0.12, -0.0075, 0.058), mat_dark, shoulder)
+	# Aile interne (bras) : de l'épaule au coude, à 48 % de l'envergure.
+	var inner := MeshInstance3D.new()
+	inner.mesh = _wing_surface(side, 0.0, 0.48, 0.0)
+	inner.material_override = mat_wing
+	shoulder.add_child(inner)
 	var elbow := Node3D.new()
-	elbow.position = Vector3(side * 0.24, 0.0, 0.0)
+	elbow.position = Vector3(side * HALF_SPAN * 0.48, 0.0, 0.0)
 	shoulder.add_child(elbow)
-	# Aile externe (main) : rémiges noires, plus étroite vers la pointe.
-	_box(Vector3(0.20, 0.01, 0.11), Vector3(side * 0.10, 0.0, 0.01), mat_white, elbow)
-	_box(Vector3(0.20, 0.004, 0.055), Vector3(side * 0.10, 0.0065, 0.04), mat_dark, elbow)
-	_box(Vector3(0.20, 0.004, 0.055), Vector3(side * 0.10, -0.0065, 0.04), mat_dark, elbow)
-	_box(Vector3(0.09, 0.011, 0.07), Vector3(side * 0.245, 0.0, 0.02), mat_dark, elbow)
+	# Aile externe (main) : du coude à la pointe.
+	var outer := MeshInstance3D.new()
+	outer.mesh = _wing_surface(side, 0.48, 1.0, HALF_SPAN * 0.48)
+	outer.material_override = mat_wing
+	elbow.add_child(outer)
 	if side < 0.0:
 		outer_l = elbow
 	else:
 		outer_r = elbow
 	return shoulder
+
+
+const HALF_SPAN := 0.5   # m, du corps à la pointe de l'aile
+
+
+## Profil en plan d'une aile de fou : longue, étroite, pointue. s = fraction de l'envergure.
+static func _chord(s: float) -> float:
+	if s < 0.6:
+		return lerpf(0.165, 0.13, s / 0.6)
+	var t := (s - 0.6) / 0.4
+	return lerpf(0.13, 0.03, t * t * (3.0 - 2.0 * t))
+
+
+static func _leading_edge(s: float) -> float:
+	return -0.085 + 0.045 * s * s   # légère flèche vers l'arrière à la pointe
+
+
+## Surface d'aile entre deux fractions d'envergure, avec cambrure et couleurs par sommet :
+## couvertures blanches, rémiges (bord de fuite et pointe) noires.
+static func _wing_surface(side: float, s0: float, s1: float, x_offset: float) -> ArrayMesh:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var n_span := 5
+	var n_chord := 4
+	var white := Color(0.96, 0.96, 0.94)
+	var dark := Color(0.12, 0.11, 0.11)
+	var grey := Color(0.55, 0.55, 0.55)
+	var pts: Array = []
+	for i in n_span + 1:
+		var s := lerpf(s0, s1, float(i) / n_span)
+		var chord := _chord(s)
+		var le := _leading_edge(s)
+		var row: Array = []
+		for j in n_chord + 1:
+			var t := float(j) / n_chord
+			var y := -0.012 * sin(t * PI) * (1.0 - s * 0.6)   # cambrure
+			var p := Vector3(side * (s * HALF_SPAN - x_offset), y, le + chord * t)
+			# Rémiges : arrière de l'aile et pointe.
+			var feather := smoothstep(0.5, 0.62, t) + smoothstep(0.86, 0.94, s)
+			var col := white.lerp(dark, clampf(feather, 0.0, 1.0))
+			if t > 0.4 and t < 0.6 and s < 0.85:
+				col = col.lerp(grey, 0.3)
+			row.append([p, col])
+		pts.append(row)
+	for i in n_span:
+		for j in n_chord:
+			var a: Array = pts[i][j]
+			var b: Array = pts[i + 1][j]
+			var c: Array = pts[i + 1][j + 1]
+			var d: Array = pts[i][j + 1]
+			# Deux faces (dessus et dessous) pour que l'aile soit visible des deux côtés.
+			_tri(st, a, b, c)
+			_tri(st, a, c, d)
+			_tri(st, a, c, b)
+			_tri(st, a, d, c)
+	st.generate_normals()
+	return st.commit()
+
+
+static func _tri(st: SurfaceTool, a: Array, b: Array, c: Array) -> void:
+	st.set_color(a[1])
+	st.add_vertex(a[0])
+	st.set_color(b[1])
+	st.add_vertex(b[0])
+	st.set_color(c[1])
+	st.add_vertex(c[0])
+
+
+## Queue : éventail de plumes, pointes sombres.
+static func _tail_surface() -> ArrayMesh:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var white := Color(0.96, 0.96, 0.94)
+	var dark := Color(0.12, 0.11, 0.11)
+	var n := 6
+	for i in n:
+		var a0 := deg_to_rad(-22.0 + 44.0 * i / n)
+		var a1 := deg_to_rad(-22.0 + 44.0 * (i + 1) / n)
+		var root := Vector3(0.0, 0.0, 0.0)
+		var p0 := Vector3(sin(a0) * 0.14, 0.0, cos(a0) * 0.14)
+		var p1 := Vector3(sin(a1) * 0.14, 0.0, cos(a1) * 0.14)
+		var m0 := Vector3(sin(a0) * 0.1, 0.0, cos(a0) * 0.1)
+		var m1 := Vector3(sin(a1) * 0.1, 0.0, cos(a1) * 0.1)
+		for flip in [false, true]:
+			var b := [root, m0, m1, p0, p1]
+			if flip:
+				b = [root, m1, m0, p1, p0]
+			_tri(st, [b[0], white], [b[1], white], [b[2], white])
+			_tri(st, [b[1], white], [b[3], dark], [b[4], dark])
+			_tri(st, [b[1], white], [b[4], dark], [b[2], white])
+	st.generate_normals()
+	return st.commit()
 
 
 ## Pose des ailes selon l'état du vol.

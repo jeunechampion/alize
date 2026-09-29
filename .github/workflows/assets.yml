@@ -1,0 +1,33 @@
+name: Récupérer les ressources Poly Haven
+
+# Télécharge les modèles et textures CC0 listés dans assets/manifest.json et les enregistre dans le
+# dépôt (assets/polyhaven/), pour que le jeu, les tests et les versions les embarquent.
+# Se lance à la main (onglet Actions) ou quand le manifeste change.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['assets/manifest.json', 'tools/fetch_polyhaven.py']
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Téléchargement
+        run: python3 tools/fetch_polyhaven.py
+      - name: Enregistrement dans le dépôt
+        run: |
+          git config user.name "alize-assets"
+          git config user.email "assets@alize.local"
+          git add assets/polyhaven
+          if git diff --cached --quiet; then
+            echo "Rien de nouveau."
+          else
+            git commit -m "Ressources Poly Haven (CC0) : mise à jour depuis le manifeste"
+            git push
+          fi

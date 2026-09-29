@@ -1,0 +1,36 @@
+{
+  "_": "Ressources Poly Haven (licence CC0). Téléchargées par tools/fetch_polyhaven.py dans assets/polyhaven/.",
+  "models": {
+    "island_tree_01": {"res": "1k"},
+    "island_tree_02": {"res": "1k"},
+    "island_tree_03": {"res": "1k"},
+    "jacaranda_tree": {"res": "1k"},
+    "tree_small_02": {"res": "1k"},
+    "pachira_aquatica_01": {"res": "1k"},
+    "fern_02": {"res": "1k"},
+    "anthurium_botany_01": {"res": "1k"},
+    "calathea_orbifolia_01": {"res": "1k"},
+    "shrub_01": {"res": "1k"},
+    "shrub_02": {"res": "1k"},
+    "shrub_03": {"res": "1k"},
+    "grass_medium_02": {"res": "1k"},
+    "boulder_01": {"res": "1k"},
+    "coast_rocks_01": {"res": "1k"},
+    "coast_rocks_02": {"res": "1k"},
+    "coast_land_rocks_02": {"res": "1k"},
+    "rock_07": {"res": "1k"},
+    "sand_rocks_small_01": {"res": "1k"},
+    "dead_tree_trunk": {"res": "1k"}
+  },
+  "textures": {
+    "coast_sand_01": {"res": "2k", "maps": ["Diffuse", "nor_gl", "Rough", "AO"]},
+    "damp_beach_sand": {"res": "1k", "maps": ["Diffuse", "nor_gl", "Rough", "AO"]},
+    "coral_ground_02": {"res": "1k", "maps": ["Diffuse", "nor_gl", "Rough", "AO"]},
+    "forest_floor": {"res": "2k", "maps": ["Diffuse", "nor_gl", "Rough", "AO"]},
+    "grass_ground": {"res": "1k", "maps": ["Diffuse", "nor_gl", "Rough", "AO"]},
+    "aerial_grass_rock": {"res": "2k", "maps": ["Diffuse", "nor_gl", "Rough", "AO"]},
+    "dark_rock": {"res": "2k", "maps": ["Diffuse", "nor_gl", "Rough", "AO"]},
+    "cliff_side": {"res": "2k", "maps": ["Diffuse", "nor_gl", "Rough", "AO"]},
+    "brown_mud_leaves_01": {"res": "1k", "maps": ["Diffuse", "nor_gl", "Rough", "AO"]}
+  }
+}

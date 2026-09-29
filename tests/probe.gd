@@ -25,7 +25,15 @@ func _ready() -> void:
 	cam.look_at(Vector3.ZERO)
 	var mesh := MeshInstance3D.new()
 	mesh.mesh = SphereMesh.new()
-	if mode >= 11:
+	if mode == 20:
+		var bm := BirdMesh.new()
+		add_child(bm)
+		bm.build()
+		bm.rotation_degrees = Vector3(0.0, 35.0, 0.0)
+		cam.position = Vector3(0.75, 0.45, 1.1)
+		cam.look_at(Vector3(0.0, 0.0, 0.0))
+		mesh.visible = false
+	elif mode >= 11:
 		var trng := RandomNumberGenerator.new()
 		trng.seed = 5
 		mesh.mesh = TreeBuilder.build_broadleaf(trng, 9.0, 4.5)
@@ -86,4 +94,8 @@ func _process(_d: float) -> void:
 		print("MODE ", mode, " lit ", img.get_pixel(760, 330), " dark ", img.get_pixel(520, 330), " center ", img.get_pixel(640, 360), " up ", img.get_pixel(640, 250))
 		if mode >= 11:
 			img.save_png("/home/claude/shotq/probe_%d.png" % mode)
+	if frames == 3 and mode == 20:
+		var bm: BirdMesh = get_child(get_child_count() - 1)
+		bm.flap_phase = 0.9
+		bm.flap_blend = 1.0
 		get_tree().quit()
