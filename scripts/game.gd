@@ -18,6 +18,7 @@ const TIME_SPEEDS := [1.0, 30.0, 240.0]
 var _time_speed_index := 0
 
 var autotest: bool = false
+var shot_only: bool = false
 var autotest_dir: String = ""
 var start_time_msec: int = 0
 
@@ -28,6 +29,9 @@ func _ready() -> void:
 		var a: String = args[i]
 		if a == "--autotest":
 			autotest = true
+		elif a == "--shot-only":
+			autotest = true
+			shot_only = true
 		elif a.begins_with("--autotest-dir="):
 			autotest_dir = a.get_slice("=", 1)
 		elif a.begins_with("--seed="):
