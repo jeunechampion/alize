@@ -49,13 +49,19 @@ def download(url, dest, md5=None, force=False):
     return True
 
 
-def fetch_model(slug, res, force):
+def fetch_model(slug, res, force, max_bytes):
     files = fetch_json(API + slug)
     by_res = files["gltf"]
     if res not in by_res:
         res = sorted(by_res.keys(), key=lambda k: int(k.rstrip("k")))[0]
         print("  (résolution indisponible, on prend %s)" % res)
     entry = by_res[res]["gltf"]
+    total = entry.get("size", 0) + sum(i.get("size", 0) for i in entry.get("include", {}).values())
+    geometry = sum(i.get("size", 0) for rel, i in entry.get("include", {}).items() if rel.endswith(".bin"))
+    print("  %.1f Mo (géométrie %.1f Mo)" % (total / 1e6, geometry / 1e6))
+    if total > max_bytes:
+        print("  IGNORÉ : au-dessus de la limite de %.0f Mo" % (max_bytes / 1e6))
+        return 0
     folder = os.path.join(OUT, "models", slug)
     n = 0
     n += download(entry["url"], os.path.join(folder, os.path.basename(entry["url"])), entry.get("md5"), force)
@@ -89,10 +95,11 @@ def main():
         manifest = json.load(f)
     total = 0
     errors = 0
+    max_bytes = float(manifest.get("max_mb", 12)) * 1e6
     for slug, opts in manifest.get("models", {}).items():
         print("modèle", slug, flush=True)
         try:
-            total += fetch_model(slug, opts.get("res", "1k"), args.force)
+            total += fetch_model(slug, opts.get("res", "1k"), args.force, max_bytes)
         except Exception as e:  # on continue avec les autres, l'erreur est affichée
             errors += 1
             print("  ERREUR %s : %r" % (slug, e), flush=True)

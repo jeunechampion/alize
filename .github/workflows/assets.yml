@@ -33,7 +33,7 @@ jobs:
             git config user.name "alize-assets"
             git config user.email "assets@alize.local"
             du -sh assets/polyhaven || true
-            find assets/polyhaven -type f -size +90M -printf 'TROP GROS : %p (%s octets)\n' || true
+            find assets/polyhaven -type f -size +90M -printf 'TROP GROS, supprimé : %p (%s octets)\n' -delete || true
             git add assets/polyhaven
             if git diff --cached --quiet; then
               echo "Rien de nouveau."
