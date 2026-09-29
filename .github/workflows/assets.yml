@@ -8,10 +8,14 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ['assets/manifest.json', 'tools/fetch_polyhaven.py']
+    paths: ['assets/manifest.json', 'tools/fetch_polyhaven.py', '.github/workflows/assets.yml']
 
 permissions:
   contents: write
+
+concurrency:
+  group: assets
+  cancel-in-progress: false
 
 jobs:
   fetch:
@@ -20,29 +24,34 @@ jobs:
       - uses: actions/checkout@v4
       - name: Téléchargement
         run: |
-          python3 -u tools/fetch_polyhaven.py 2>&1 | tee fetch.log
-          echo "exit=${PIPESTATUS[0]}" >> fetch.log
+          python3 -u tools/fetch_polyhaven.py 2>&1 | tee /tmp/fetch.log
+          echo "exit=${PIPESTATUS[0]}" >> /tmp/fetch.log
+      - name: Enregistrement dans le dépôt
+        run: |
+          set -x
+          {
+            git config user.name "alize-assets"
+            git config user.email "assets@alize.local"
+            du -sh assets/polyhaven || true
+            find assets/polyhaven -type f -size +90M -printf 'TROP GROS : %p (%s octets)\n' || true
+            git add assets/polyhaven
+            if git diff --cached --quiet; then
+              echo "Rien de nouveau."
+            else
+              git commit -q -m "Ressources Poly Haven (CC0) : mise à jour depuis le manifeste"
+              git pull --rebase -q origin main
+              git push origin HEAD:main
+              echo "Ressources enregistrées : $(git rev-parse --short HEAD)"
+            fi
+          } 2>&1 | tee -a /tmp/fetch.log
+          exit "${PIPESTATUS[0]}"
       - name: Journal (branche ci-logs, lisible depuis l'atelier de Claude)
         if: always()
         run: |
-          git config user.name "alize-assets"
-          git config user.email "assets@alize.local"
-          mkdir -p /tmp/cilog && cp fetch.log /tmp/cilog/fetch-assets.log
-          git stash -u -q || true
-          git checkout -q --orphan ci-logs
-          git rm -rfq . || true
-          cp /tmp/cilog/fetch-assets.log .
-          git add fetch-assets.log
-          git commit -qm "journal du téléchargement des ressources"
-          git push -f origin ci-logs
-          git checkout -q main
-          git stash pop -q || true
-      - name: Enregistrement dans le dépôt
-        run: |
-          git add assets/polyhaven
-          if git diff --cached --quiet; then
-            echo "Rien de nouveau."
-          else
-            git commit -m "Ressources Poly Haven (CC0) : mise à jour depuis le manifeste"
-            git push origin main
-          fi
+          # Commit fabriqué avec les commandes de plomberie : on ne touche jamais à l'arbre de travail.
+          blob=$(git hash-object -w /tmp/fetch.log)
+          tree=$(printf '100644 blob %s\tfetch-assets.log\n' "$blob" | git mktree)
+          commit=$(GIT_AUTHOR_NAME=alize-assets GIT_AUTHOR_EMAIL=assets@alize.local \
+                   GIT_COMMITTER_NAME=alize-assets GIT_COMMITTER_EMAIL=assets@alize.local \
+                   git commit-tree "$tree" -m "journal du téléchargement des ressources")
+          git push -f origin "$commit:refs/heads/ci-logs"
