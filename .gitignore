@@ -14,3 +14,4 @@ Thumbs.db
 assets/sketchfab/*_[0-9]*.png
 # Réglages d'import des atlas d'imposteurs (alpha prémultiplié : pas de correction de bord)
 !assets/impostors/*.import
+assets/sketchfab/*_[0-9]*.jpg
