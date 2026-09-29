@@ -1,0 +1,10 @@
+# Godot
+.godot/
+*.import
+export/
+*.tmp
+# Autotest output
+autotest_out/
+# OS
+.DS_Store
+Thumbs.db
