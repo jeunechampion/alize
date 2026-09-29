@@ -47,6 +47,8 @@ func _process(dt: float) -> void:
 	var aim_dir := FlightModel.dir_from_heading(m.aim_yaw)
 	aim_dir = Vector3(aim_dir.x * cos(m.aim_pitch), sin(m.aim_pitch), aim_dir.z * cos(m.aim_pitch)).normalized()
 
+	if bird.body:
+		bird.body.visible = not first_person   # à la première personne, on ne voit pas son propre corps
 	if first_person:
 		var head_pos: Vector3 = bird.global_transform * Vector3(0.0, 0.06, -0.14)
 		var fwd: Vector3 = -bird.global_transform.basis.z

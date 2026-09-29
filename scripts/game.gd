@@ -9,6 +9,10 @@ var seed_text: String = "alize"
 var world_seed: int = 0
 
 ## Heure du jour, en heures décimales (0..24). 8.5 = 8h30.
+var spawn_dist := 900.0
+var spawn_alt := 240.0
+var spawn_side := 0.0
+var spawn_river := -1      # >= 0 : départ au-dessus de cette rivière, face à l'amont
 var time_of_day: float = 8.5
 ## Durée d'une journée complète en secondes réelles (3600 = 1 h, comme décidé).
 var day_length_seconds: float = 3600.0
@@ -38,6 +42,14 @@ func _ready() -> void:
 			seed_text = a.get_slice("=", 1)
 		elif a.begins_with("--time="):
 			time_of_day = float(a.get_slice("=", 1))
+		elif a.begins_with("--spawn-dist="):   # distance à la côte le long de l'approche (négatif : au-dessus de l'île)
+			spawn_dist = float(a.get_slice("=", 1))
+		elif a.begins_with("--spawn-alt="):
+			spawn_alt = float(a.get_slice("=", 1))
+		elif a.begins_with("--spawn-side="):   # décalage latéral (m)
+			spawn_side = float(a.get_slice("=", 1))
+		elif a.begins_with("--spawn-river="):
+			spawn_river = int(a.get_slice("=", 1))
 	world_seed = seed_from_text(seed_text)
 
 ## Même texte -> même graine, sur toutes les machines (hachage FNV-1a 32 bits, sans dépendre de la plateforme).

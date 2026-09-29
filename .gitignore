@@ -10,3 +10,5 @@ autotest_out/
 # OS
 .DS_Store
 Thumbs.db
+# Textures extraites des .glb par Godot (régénérées à l'import)
+assets/sketchfab/*_[0-9]*.png

@@ -5,6 +5,9 @@
 ## compression des basses altitudes pour former les plages ; plateau récifal puis tombant
 ## pour le fond marin. L'érosion hydraulique arrivera dans le module natif (étape 4).
 ##
+## Rivières : tracées par descente de pente depuis les flancs du volcan jusqu'à la mer, puis
+## creusées dans le champ de hauteurs (niveau d'eau strictement décroissant vers l'aval).
+##
 ## Le relief est un champ de hauteurs de SIZE x SIZE échantillons couvrant EXTENT mètres.
 class_name IslandGenerator
 extends RefCounted
@@ -18,6 +21,9 @@ var world_seed: int
 var spacing: float = EXTENT / float(SIZE - 1)
 var heights := PackedFloat32Array()
 var params := {}
+var rivers: Array = []             # [{points: PackedVector3Array (x, niveau d'eau, z), widths: PackedFloat32Array}]
+var river_dist := PackedFloat32Array()   # par échantillon : distance (m) à la rivière la plus proche, bornée
+const RIVER_DIST_MAX := 60.0
 
 var _n_warp_x: FastNoiseLite
 var _n_warp_z: FastNoiseLite
@@ -142,6 +148,7 @@ func generate() -> void:
 		var row: PackedFloat32Array = rows[j]
 		for i in SIZE:
 			heights[j * SIZE + i] = row[i]
+	_carve_rivers()
 
 
 func _compute_row(j: int, rows: Array) -> void:
@@ -152,6 +159,144 @@ func _compute_row(j: int, rows: Array) -> void:
 		var x := -EXTENT * 0.5 + i * spacing
 		row[i] = height_function(x, z)
 	rows[j] = row
+
+
+## Rivières : sources sur les flancs du volcan et les hautes collines, descente de pente avec un peu
+## d'inertie, arrêt à la mer. Le niveau d'eau ne remonte jamais ; si le relief barre la route de plus
+## de 30 m, la rivière s'arrête (elle serait un lac). Le lit est ensuite creusé : chenal au centre,
+## berges en pente douce. Déterministe : générateur propre à la seed.
+func _carve_rivers() -> void:
+	rivers.clear()
+	river_dist.resize(SIZE * SIZE)
+	river_dist.fill(RIVER_DIST_MAX)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = world_seed ^ 0x52495645
+	var wanted := rng.randi_range(3, 5)
+	var tries := 0
+	while rivers.size() < wanted and tries < 40:
+		tries += 1
+		var ang := rng.randf() * TAU
+		var src := _volcano_pos + Vector2.from_angle(ang) * _volcano_radius * rng.randf_range(0.42, 0.8)
+		if rng.randf() < 0.3:   # parfois depuis les collines centrales
+			src = _center + Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(200.0, 700.0)
+		var h0 := height_at(src.x, src.y)
+		if h0 < 110.0:
+			continue
+		# Pas deux sources trop proches.
+		var too_close := false
+		for r in rivers:
+			var p0: Vector3 = r.points[0]
+			if Vector2(p0.x, p0.z).distance_to(src) < 350.0:
+				too_close = true
+		if too_close:
+			continue
+		var river := _trace_river(src, h0, rng)
+		if river.is_empty():
+			continue
+		rivers.append(river)
+	for r in rivers:
+		_carve_one(r)
+
+
+func _trace_river(src: Vector2, h0: float, rng: RandomNumberGenerator) -> Dictionary:
+	var step := 6.0
+	var points := PackedVector3Array()
+	var widths := PackedFloat32Array()
+	var p := src
+	var level := h0
+	var dir := Vector2.ZERO
+	var dist := 0.0
+	var wobble := FastNoiseLite.new()
+	wobble.seed = rng.randi()
+	wobble.frequency = 1.0 / 90.0
+	for k in 2500:
+		var g := gradient_at(p.x, p.y)
+		var down := -g
+		if down.length() < 1e-4:
+			down = dir if dir != Vector2.ZERO else Vector2.from_angle(rng.randf() * TAU)
+		down = down.normalized()
+		# Inertie et méandres : la rivière ne suit pas exactement la ligne de plus grande pente.
+		var w := wobble.get_noise_2d(p.x, p.y)
+		down = down.rotated(w * 0.7)
+		dir = (dir * 0.55 + down * 0.45).normalized() if dir != Vector2.ZERO else down
+		p += dir * step
+		dist += step
+		if absf(p.x) > EXTENT * 0.5 - 20.0 or absf(p.y) > EXTENT * 0.5 - 20.0:
+			return {}
+		var hp := height_at(p.x, p.y)
+		level = minf(level, hp) - 0.04 * step
+		if hp - level > 30.0:
+			return {}   # barré par le relief : ce serait un lac, on abandonne
+		var width := clampf(2.5 + dist * 0.0045, 2.5, 11.0)
+		points.append(Vector3(p.x, level, p.y))
+		widths.append(width)
+		if hp < SEA_LEVEL + 0.3 or level < SEA_LEVEL + 0.2:
+			break
+	if points.size() < 40 or points[points.size() - 1].y > SEA_LEVEL + 3.0:
+		return {}
+	return {"points": points, "widths": widths}
+
+
+func _carve_one(river: Dictionary) -> void:
+	var points: PackedVector3Array = river.points
+	var widths: PackedFloat32Array = river.widths
+	var half := EXTENT * 0.5
+	for k in points.size():
+		var pt := points[k]
+		var w := widths[k]
+		var reach := w * 1.5 + 14.0
+		var depth := 1.0 + w * 0.22
+		var ci := int((pt.x + half) / spacing)
+		var cj := int((pt.z + half) / spacing)
+		var n := int(ceil(reach / spacing)) + 1
+		for j in range(cj - n, cj + n + 1):
+			if j < 0 or j >= SIZE:
+				continue
+			for i in range(ci - n, ci + n + 1):
+				if i < 0 or i >= SIZE:
+					continue
+				var sx := -half + i * spacing
+				var sz := -half + j * spacing
+				var d := Vector2(sx - pt.x, sz - pt.z).length()
+				if d > reach:
+					continue
+				var idx := j * SIZE + i
+				var target: float
+				if d < w:
+					# Chenal : profil parabolique sous le niveau de l'eau.
+					target = pt.y - depth * (1.0 - (d / w) * (d / w))
+				else:
+					# Berges : pente douce depuis le bord de l'eau, sans dépasser le relief existant.
+					target = pt.y + (d - w) * 0.30
+				if target < heights[idx]:
+					heights[idx] = target
+				var rd := maxf(d - w, 0.0)
+				if rd < river_dist[idx]:
+					river_dist[idx] = rd
+
+
+## Distance (m) à la rivière la plus proche (bord de l'eau), bornée à RIVER_DIST_MAX.
+func river_distance_at(x: float, z: float) -> float:
+	if river_dist.is_empty():
+		return RIVER_DIST_MAX
+	var fx := (x + EXTENT * 0.5) / spacing
+	var fz := (z + EXTENT * 0.5) / spacing
+	if fx < 0.0 or fz < 0.0 or fx > SIZE - 1 or fz > SIZE - 1:
+		return RIVER_DIST_MAX
+	var i := int(fx)
+	var j := int(fz)
+	var tx := fx - i
+	var tz := fz - j
+	var a := river_dist[clampi(j, 0, SIZE - 1) * SIZE + clampi(i, 0, SIZE - 1)]
+	var b := river_dist[clampi(j, 0, SIZE - 1) * SIZE + clampi(i + 1, 0, SIZE - 1)]
+	var c := river_dist[clampi(j + 1, 0, SIZE - 1) * SIZE + clampi(i, 0, SIZE - 1)]
+	var d := river_dist[clampi(j + 1, 0, SIZE - 1) * SIZE + clampi(i + 1, 0, SIZE - 1)]
+	return lerpf(lerpf(a, b, tx), lerpf(c, d, tx), tz)
+
+
+## Image (FORMAT_RF) de la distance aux rivières, pour le shader de terrain.
+func make_river_image() -> Image:
+	return Image.create_from_data(SIZE, SIZE, false, Image.FORMAT_RF, river_dist.to_byte_array())
 
 
 ## Hauteur d'un échantillon de la grille (indices bornés).
@@ -240,10 +385,15 @@ func stats() -> Dictionary:
 		maxh = maxf(maxh, h)
 		minh = minf(minh, h)
 	var total := float(heights.size())
+	var river_len := 0.0
+	for r in rivers:
+		river_len += (r.points as PackedVector3Array).size() * 6.0
 	return {
 		"land_fraction": land / total,
 		"beach_fraction": beach / total,
 		"max_height": maxh,
 		"min_height": minh,
 		"land_km2": land / total * (EXTENT / 1000.0) * (EXTENT / 1000.0),
+		"rivers": rivers.size(),
+		"river_km": river_len / 1000.0,
 	}

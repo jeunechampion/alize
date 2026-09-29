@@ -129,7 +129,7 @@ func _physics_process(_dt: float) -> void:
 			_first_person_done = true
 			main.cam.toggle_view()
 		if tick == 2640:
-			_shoot("06_premiere_personne")
+			await _shoot("06_premiere_personne")
 			main.cam.toggle_view()
 	elif t < 60.0:
 		_set_phase("thermique")

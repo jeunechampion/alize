@@ -5,6 +5,7 @@ var generator: IslandGenerator
 var island: Island
 var vegetation: Vegetation
 var ocean: Ocean
+var river: River
 var sky: SkyDome
 var wind: WindField
 var bird: Bird
@@ -42,7 +43,7 @@ func _ready() -> void:
 
 func build_world(seed_value: int) -> void:
 	var t0 := Time.get_ticks_msec()
-	for c in [island, vegetation, ocean, sky, bird, cam, hud, wind_audio]:
+	for c in [island, vegetation, ocean, river, sky, bird, cam, hud, wind_audio]:
 		if c:
 			c.queue_free()
 	for tv in thermal_visuals:
@@ -68,6 +69,11 @@ func build_world(seed_value: int) -> void:
 	ocean.name = "Ocean"
 	add_child(ocean)
 	ocean.setup(island.height_texture, generator)
+
+	river = River.new()
+	river.name = "Rivers"
+	add_child(river)
+	river.build(generator)
 
 	sky = SkyDome.new()
 	sky.name = "Sky"
@@ -111,9 +117,18 @@ func _choose_spawn() -> void:
 	var vpos: Vector2 = generator.params.volcano_pos
 	var dir := (center - vpos).normalized()   # on part du côté opposé au volcan pour le voir en face
 	var coast := _find_coast(center, dir)
-	var start := coast + dir * 900.0
-	spawn_pos = Vector3(start.x, 240.0, start.y)
+	var start := coast + dir * Game.spawn_dist + Vector2(-dir.y, dir.x) * Game.spawn_side
+	spawn_pos = Vector3(start.x, Game.spawn_alt, start.y)
 	spawn_heading = FlightModel.heading_of(Vector3(-dir.x, 0.0, -dir.y))
+	if Game.spawn_river >= 0 and Game.spawn_river < generator.rivers.size():
+		# Au-dessus de l'embouchure, face à l'amont.
+		var pts: PackedVector3Array = generator.rivers[Game.spawn_river].points
+		var mouth := pts[pts.size() - 1]
+		var mid := pts[pts.size() / 2]
+		var up_dir := Vector2(mid.x - mouth.x, mid.z - mouth.z).normalized()
+		var back := Vector2(mouth.x, mouth.z) - up_dir * Game.spawn_dist
+		spawn_pos = Vector3(back.x, Game.spawn_alt, back.y)
+		spawn_heading = FlightModel.heading_of(Vector3(up_dir.x, 0.0, up_dir.y))
 
 
 ## Premier point le long d'un rayon depuis le centre où le sol passe sous la mer.

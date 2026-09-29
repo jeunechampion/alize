@@ -16,7 +16,7 @@ var state: int = State.FLYING
 var wind: WindField
 var generator: IslandGenerator
 var ocean: Ocean
-var body: BirdMesh
+var body: BirdModel
 
 var stun_timer := 0.0
 var input_enabled := true
@@ -34,7 +34,7 @@ var _land_heading := 0.0
 
 
 func _ready() -> void:
-	body = BirdMesh.new()
+	body = BirdModel.new()
 	body.name = "Body"
 	add_child(body)
 	body.build()
