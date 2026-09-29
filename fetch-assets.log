@@ -1,0 +1,57 @@
+modèle pachira_aquatica_01
+  5.1 Mo (géométrie 2.0 Mo)
+modèle fern_02
+  1.1 Mo (géométrie 0.2 Mo)
+modèle anthurium_botany_01
+  3.2 Mo (géométrie 1.7 Mo)
+modèle calathea_orbifolia_01
+  1.9 Mo (géométrie 0.4 Mo)
+modèle shrub_01
+  6.9 Mo (géométrie 5.2 Mo)
+modèle shrub_02
+  2.0 Mo (géométrie 0.8 Mo)
+modèle shrub_03
+  1.6 Mo (géométrie 0.2 Mo)
+modèle grass_medium_02
+  0.8 Mo (géométrie 0.3 Mo)
+modèle boulder_01
+  5.8 Mo (géométrie 2.9 Mo)
+modèle coast_rocks_02
+  38.5 Mo (géométrie 35.9 Mo)
+  IGNORÉ : au-dessus de la limite de 12 Mo
+modèle coast_land_rocks_02
+  39.6 Mo (géométrie 36.7 Mo)
+  IGNORÉ : au-dessus de la limite de 12 Mo
+modèle rock_07
+  2.2 Mo (géométrie 0.5 Mo)
+modèle sand_rocks_small_01
+  23.8 Mo (géométrie 21.3 Mo)
+  IGNORÉ : au-dessus de la limite de 12 Mo
+modèle dead_tree_trunk
+  4.8 Mo (géométrie 2.3 Mo)
+texture coast_sand_01
+texture damp_beach_sand
+texture coral_ground_02
+texture forest_floor
+texture grass_ground
+texture aerial_grass_rock
+texture dark_rock
+texture cliff_side
+texture brown_mud_leaves_01
+85 fichier(s) téléchargé(s), 0 erreur(s).
+exit=0
++ git config user.name alize-assets
++ git config user.email assets@alize.local
++ du -sh assets/polyhaven
+58M	assets/polyhaven
++ find assets/polyhaven -type f -size +90M -printf 'TROP GROS, supprimé : %p (%s octets)\n' -delete
++ git add assets/polyhaven
++ git diff --cached --quiet
++ git commit -q -m 'Ressources Poly Haven (CC0) : mise à jour depuis le manifeste'
++ git pull --rebase -q origin main
++ git push origin HEAD:main
+To https://github.com/jeunechampion/alize
+   758cbc5..4eafc3b  HEAD -> main
+++ git rev-parse --short HEAD
++ echo 'Ressources enregistrées : 4eafc3b'
+Ressources enregistrées : 4eafc3b
