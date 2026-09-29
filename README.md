@@ -5,8 +5,9 @@ Un oiseau, un archipel infini, le vent pour seul moteur.
 Alizé est un jeu d'exploration : tu incarnes un fou à pieds rouges qui grandit, de poussin à ancien,
 dans un monde d'îles tropicales généré à l'infini à partir d'une seed. Le vol repose sur la vraie
 physique (portance, traînée, thermiques, ascendances de pente, vol dynamique), le monde sur les
-algorithmes de la science réelle (bruit fractal, érosion hydraulique, vagues de Gerstner, diffusion
-atmosphérique, boids, colonisation d'espace).
+algorithmes de la science réelle (bruit fractal, rivières par descente de pente, vagues de Gerstner,
+diffusion atmosphérique, boids). Les arbres, les plantes et l'oiseau sont des modèles d'artistes
+sous licence libre (Sketchfab CC-BY, Poly Haven CC0), listés dans `assets/CREDITS.md`.
 
 ## Jouer
 
@@ -40,6 +41,17 @@ directement dans l'éditeur Godot, et se lance en ligne de commande :
 ```
 godot --path . 
 ```
+
+Les modèles glTF sont dans `assets/sketchfab/` et `assets/polyhaven/` (ce dernier est rempli par le
+workflow GitHub « Récupérer les ressources Poly Haven » depuis `assets/manifest.json`). Les atlas
+d'imposteurs (arbres lointains) se recuisent avec :
+
+```
+xvfb-run godot --path . --rendering-method gl_compatibility tools/bake_impostors.tscn
+```
+
+Catalogue des espèces et de l'oiseau (captures) : `tests/catalog.tscn` avec `--out=`, `--species=`,
+`--impostors`, `--bird`.
 
 Tests sans fenêtre (générateur d'île, modèle de vol) :
 

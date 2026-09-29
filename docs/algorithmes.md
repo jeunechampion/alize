@@ -1,7 +1,9 @@
 # Les algorithmes d'Alizé, en deux lignes chacun
 
-Tout dans Alizé est calculé : aucune image, aucun modèle 3D, aucun son n'est importé. Voici ce qui
-tourne sous le capot, et d'où ça vient. Le document de conception complet contient le reste.
+Le relief, la mer, le ciel, le vent, le vol et le placement de chaque plante sont calculés. Les
+modèles 3D (arbres, plantes, oiseau, rochers) et les textures de sol sont des œuvres d'artistes
+sous licence libre (voir `assets/CREDITS.md`) : le jeu les assemble, les habille et les éclaire.
+Voici ce qui tourne sous le capot, et d'où ça vient. Le document de conception contient le reste.
 
 ## L'île (`scripts/world/island_generator.gd`)
 
@@ -20,6 +22,11 @@ tourne sous le capot, et d'où ça vient. Le document de conception complet cont
   vers le grand fond.
 - **Déterminisme**. Toutes les valeurs aléatoires sortent d'un générateur initialisé par la seed :
   même mot, même île, sur toutes les machines. L'empreinte de l'île est vérifiée par les tests.
+
+- **Rivières**. Trois à cinq sources sur les flancs du volcan ; chaque cours d'eau descend la ligne
+  de plus grande pente avec un peu d'inertie et de méandres (bruit), jusqu'à la mer. Le niveau de
+  l'eau ne remonte jamais ; le lit est creusé dans le relief (chenal parabolique, berges à 30 %),
+  et une carte de distance aux rivières sert au sol (boue) et aux plantes (bananiers, bambous).
 
 L'érosion hydraulique (Mei, Decaudin & Hu 2007) viendra avec le module natif, à l'étape « archipel ».
 
@@ -69,26 +76,47 @@ L'érosion hydraulique (Mei, Decaudin & Hu 2007) viendra avec le module natif, �
 - **Finesse**. Théorique : 12. Mesurée dans le jeu : environ 10 (le trim n'est pas au meilleur
   plané). Vitesse de décrochage : 8,7 m/s.
 
-## La végétation (`scripts/world/tree_builder.gd`, `vegetation.gd`)
+## La végétation (`scripts/world/vegetation.gd`, `asset_library.gd`, `shaders/vegetation.gdshader`)
 
-- **Colonisation d'espace** (Runions, Lane & Prusinkiewicz 2007). Des points de lumière sont semés
-  dans le volume de la couronne ; à chaque itération, chaque bout de branche pousse vers la moyenne
-  des points qui lui sont les plus proches, et les points atteints disparaissent. Les formes
-  obtenues sont celles des vrais arbres : ramification irrégulière, branches qui contournent.
-- **Modèle des tubes** (Murray 1926, utilisé par Runions). Le rayon d'une branche mère vaut la
-  racine 2,5-ième de la somme des rayons^2,5 de ses filles : le tronc s'épaissit naturellement.
-- **Placement**. Une grille de 13 m tremblée par hachage entier déterministe ; chaque emplacement
-  reçoit un palmier (plage basse et plate), un arbre (collines humides, pas dans les cendres) ou
-  rien, selon l'altitude, la pente et un bruit d'humidité.
-- **Vent** (Sousa, GPU Gems 3 ch. 16). Dans le shader, chaque sommet est déplacé en proportion du
-  carré de sa hauteur, avec une phase propre à chaque arbre ; les feuilles frémissent en plus.
-- **Niveaux de détail**. Près de la caméra le maillage complet (700 à 1 200 triangles), au-delà de
-  650 m une silhouette d'une vingtaine de triangles ; la répartition est refaite toutes les 0,5 s.
+- **Modèles d'artistes**. Vingt-six espèces (cocotier, dattier, chêne, grand arbre de canopée,
+  acacia, cyprès à mousse, frangipanier, bananier, bambou, fougères, monstera, hibiscus, herbes,
+  arbustes, rochers…) viennent de Sketchfab (CC-BY) et Poly Haven (CC0). Chaque glTF est aplati en
+  un seul maillage (transformations cuites dans les sommets, surfaces regroupées par matériau) et
+  ses matériaux sont convertis vers notre shader : mêmes textures, découpe alpha des feuilles, vent.
+- **Placement**. Grille de 6,5 m tremblée par hachage entier déterministe (Wang) ; chaque
+  emplacement tire une espèce selon l'altitude, la pente, un bruit d'humidité, la distance au
+  cratère et aux rivières. Densité de forêt fermée : environ 0,5 arbre par cellule de 42 m², des
+  couronnes de 8 à 18 m qui se chevauchent. Le calcul est réparti sur tous les cœurs par rangées.
+- **Rendu en masse**. Un MultiMesh par morceau de 200 m et par espèce : le moteur trie ce qui est
+  hors champ et choisit un niveau de détail (meshoptimizer, généré au chargement) par morceau.
+  Le sous-bois n'existe que dans un rayon de 160 m autour de la caméra (morceaux de 64 m créés
+  et détruits à la volée).
+- **Imposteurs** (Brucks 2018, simplifié). Au-delà de 320 m, chaque arbre devient un panneau face
+  à la caméra. Un atlas par espèce (8 azimuts × 5 élévations, albédo et normales, cuit hors ligne
+  par `tools/bake_impostors.gd`) ; le shader reprojette le point du panneau dans le repère des
+  quatre vues voisines et les mélange, puis éclaire avec les normales : l'arbre lointain réagit
+  au soleil et à l'heure comme le vrai.
+- **Anti-érosion des feuilles**. Les mipmaps moyennent l'alpha : au loin les feuilles disparaissent.
+  On relève l'alpha proportionnellement au niveau de mipmap (calculé depuis les dérivées des UV).
+- **Vent** (Sousa, GPU Gems 3 ch. 16). Déplacement en carré de la hauteur, phase par instance,
+  frémissement des feuilles ; le temps et la direction du vent sont des uniformes globaux.
 
-## L'oiseau (`scripts/bird/bird_mesh.gd`)
+## Le sol (`shaders/terrain.gdshader`, `scripts/world/terrain_textures.gd`)
 
-Corps, tête, bec, queue, ailes en deux segments et pattes sont des primitives assemblées ; le
-battement, le plané, le freinage et le piqué sont des rotations des pivots d'épaule et de coude.
+- **Tableaux de textures**. Neuf textures Poly Haven (sable sec et mouillé, herbe, sous-bois,
+  hauteurs, roche, basalte, fond du lagon, boue) empilées en trois `Texture2DArray` (albédo,
+  normales, AO-rugosité) : un échantillonneur par carte.
+- **Couches**. Les mêmes règles qu'avant (altitude, pente, bruits) donnent un poids par couche ;
+  projection au sol par les coordonnées monde, triplanaire pour la roche des falaises.
+- **Palette**. Le détail de chaque texture est gardé, sa couleur moyenne est remplacée par celle
+  de la palette « réalisme stylisé tropical » (herbe saturée, sable clair).
+
+## L'oiseau (`scripts/bird/bird_model.gd`)
+
+Le goéland de Dayvable (Sketchfab, CC-BY), squelette de 15 os. Son animation contient un cycle de
+battement et une tenue de plané : on en découpe trois animations (battement en boucle à 2,4×,
+plané, freinage ailes relevées) mélangées selon l'état du vol, puis on retouche des os par-dessus
+(tête vers la visée, queue au freinage, ailes repliées le long du corps au sol).
 
 ## Le vent sonore (`scripts/audio/wind_audio.gd`)
 
