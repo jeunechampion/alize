@@ -67,6 +67,14 @@ func set_seed_text(text: String) -> void:
 	world_seed = seed_from_text(text)
 	seed_changed.emit(world_seed)
 
+## Niveau de détail de la végétation (touche G) : 0 léger, 1 normal, 2 riche.
+var detail_level := 1
+const DETAIL_NAMES := ["léger", "normal", "riche"]
+
+func cycle_detail() -> void:
+	detail_level = (detail_level + 1) % 3
+
+
 func cycle_time_speed() -> void:
 	_time_speed_index = (_time_speed_index + 1) % TIME_SPEEDS.size()
 	time_speed = TIME_SPEEDS[_time_speed_index]

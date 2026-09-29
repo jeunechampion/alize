@@ -39,6 +39,41 @@ func run_all() -> void:
 	var g2 := IslandGenerator.new(GameScript.seed_from_text("alize"))
 	g2.generate()
 	check(g1.fingerprint() == g2.fingerprint(), "même seed -> même île (%s)" % g1.fingerprint())
+	check(g1.rivers.size() >= 1, "au moins une rivière (%d, %.1f km)" % [g1.rivers.size(), g1.stats().river_km])
+	var river_ok := true
+	for r in g1.rivers:
+		var pts: PackedVector3Array = r.points
+		for k in range(1, pts.size()):
+			if pts[k].y > pts[k - 1].y:
+				river_ok = false
+		if pts[pts.size() - 1].y > IslandGenerator.SEA_LEVEL + 3.0:
+			river_ok = false
+	check(river_ok, "rivières : niveau d'eau décroissant jusqu'à la mer")
+	check(g1.river_distance_at(0.0, 0.0) <= IslandGenerator.RIVER_DIST_MAX and g1.river_distance_at(9000.0, 0.0) == IslandGenerator.RIVER_DIST_MAX, "distance aux rivières bornée")
+
+	print("== Végétation ==")
+	var fp := []
+	var counts := []
+	for pass_i in 2:
+		var veg := Vegetation.new()
+		get_root().add_child(veg)
+		veg.build(g1, GameScript.seed_from_text("alize"), Vector2(-1.0, 0.25))
+		var h: int = 0
+		var n_inst := 0
+		for c in veg.get_children():
+			if c is MultiMeshInstance3D and not ("_loin" in String(c.name)):
+				var buf: PackedFloat32Array = c.multimesh.buffer
+				n_inst += c.multimesh.instance_count
+				# empreinte : quelques flottants par instance
+				var k := 0
+				while k < buf.size():
+					h = (h * 31 + int(buf[k] * 100.0)) & 0x7FFFFFFF
+					k += 20 * 7
+		fp.append(h)
+		counts.append(n_inst)
+		veg.free()
+	check(counts[0] > 20000, "forêt dense : %d arbres" % counts[0])
+	check(fp[0] == fp[1] and counts[0] == counts[1], "même seed -> mêmes arbres (empreinte %d)" % fp[0])
 	var g3 := IslandGenerator.new(GameScript.seed_from_text("autre"))
 	g3.generate()
 	check(g1.fingerprint() != g3.fingerprint(), "seed différente -> île différente")

@@ -209,6 +209,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		Game.set_seed_text(str((Game.world_seed * 1103515245 + 12345) & 0x7FFFFFFF))
 		build_world(Game.world_seed)
 		hud.flash("Nouvelle île : seed %s" % Game.seed_text, 4.0)
+	elif event.is_action_pressed("detail_level"):
+		Game.cycle_detail()
+		vegetation.apply_detail(Game.detail_level)
+		hud.flash("Végétation : %s" % Game.DETAIL_NAMES[Game.detail_level], 2.5)
 	elif event.is_action_pressed("screenshot"):
 		var img := get_viewport().get_texture().get_image()
 		var path := "user://capture_%s.png" % Time.get_datetime_string_from_system().replace(":", "-")

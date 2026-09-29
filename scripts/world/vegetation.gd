@@ -13,7 +13,8 @@ const UNDER_CELL := 4.5       # m pour le sous-bois
 const CHUNK := 200.0          # m, morceaux d'arbres
 const UNDER_CHUNK := 64.0     # m, morceaux de sous-bois
 const UNDER_RADIUS := 160.0   # m autour de la caméra
-const FAR_SWITCH := 320.0     # m : au-delà, maillages effacés (imposteurs)
+const FAR_SWITCH := 320.0     # m : au-delà, maillages effacés (imposteurs) au niveau de détail normal
+const DETAIL_SWITCH := [180.0, 320.0, 520.0]   # par niveau de détail (touche G)
 const LOD_BIAS := 0.6         # < 1 : niveaux de détail plus tôt (forêt dense)
 const STRIDE := 20            # floats par instance : transformation 12, couleur 4, données 4
 
@@ -60,6 +61,8 @@ var tree_count := 0
 var models := {}             # espèce -> {mesh, height, radius}
 var _humidity: FastNoiseLite
 var _tree_nodes: Array = []  # MultiMeshInstance3D des arbres
+var _impostor_nodes: Array = []
+var _under_enabled := true
 var _under_chunks := {}      # Vector2i -> Node3D
 var _under_timer := 0.0
 var _wind_time := 0.0
@@ -76,6 +79,7 @@ func build(gen: IslandGenerator, seed_v: int, wind_dir: Vector2) -> void:
 	for c in get_children():
 		c.queue_free()
 	_tree_nodes.clear()
+	_impostor_nodes.clear()
 	_under_chunks.clear()
 	_tree_chunks.clear()
 	_last_under_center = Vector2i(1 << 30, 0)
@@ -136,10 +140,43 @@ func build(gen: IslandGenerator, seed_v: int, wind_dir: Vector2) -> void:
 				far.visibility_range_begin_margin = 60.0
 				far.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
 				add_child(far)
+				_impostor_nodes.append(far)
 			add_child(mmi)
 			_tree_nodes.append(mmi)
 	var t2 := Time.get_ticks_msec()
+	apply_detail(_current_detail())
 	print("Végétation : %d arbres dans %d morceaux (%d ms de modèles, %d ms de placement)" % [tree_count, _tree_chunks.size(), t1 - t0, t2 - t1])
+
+
+## Niveau de détail demandé par le jeu (autoload Game), 1 hors jeu (tests, outils).
+static func _current_detail() -> int:
+	var loop := Engine.get_main_loop()
+	if loop is SceneTree:
+		var game := (loop as SceneTree).root.get_node_or_null("Game")
+		if game and "detail_level" in game:
+			return game.detail_level
+	return 1
+
+
+## Niveau de détail : distance de bascule vers les imposteurs, ombres des arbres, sous-bois.
+func apply_detail(level: int) -> void:
+	level = clampi(level, 0, DETAIL_SWITCH.size() - 1)
+	var far: float = DETAIL_SWITCH[level]
+	var shadows := level >= 1 and OS.get_environment("ALIZE_TREESHADOW") != "0"
+	for mmi in _tree_nodes:
+		if mmi.visibility_range_end > 0.0:
+			mmi.visibility_range_end = far
+		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if shadows else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	for far_node in _impostor_nodes:
+		far_node.visibility_range_begin = far
+	_under_enabled = level >= 1
+	if not _under_enabled:
+		for key in _under_chunks.keys():
+			var node: Node = _under_chunks[key]
+			if node:
+				node.queue_free()
+		_under_chunks.clear()
+		_last_under_center = Vector2i(1 << 30, 0)
 
 
 ## Une rangée de cellules d'arbres (exécutée dans un fil du WorkerThreadPool).
@@ -481,5 +518,5 @@ func _process(delta: float) -> void:
 	if _under_timer <= 0.0:
 		_under_timer = 0.25
 		var cam := get_viewport().get_camera_3d()
-		if cam and generator:
+		if cam and generator and _under_enabled:
 			update_undergrowth(cam.global_position)

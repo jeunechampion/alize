@@ -97,7 +97,7 @@ func _on_draw() -> void:
 			"Souris : diriger      Espace : battre des ailes",
 			"S / clic droit : freiner      W : piquer      A-Q / D : roulis",
 			"E : se poser      V : caméra      T : vitesse du temps",
-			"N : nouvelle île      R : recommencer      H : aide      Échap : souris",
+			"N : nouvelle île      R : recommencer      G : détail végétation      H : aide      Échap : souris",
 		]
 	else:
 		help_lines = ["H : aide"]
