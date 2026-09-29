@@ -54,7 +54,10 @@ godot --path . -- --autotest --autotest-dir=/tmp/alize_shots
 ```
 
 Le document de conception complet (décisions, systèmes, fiches algorithmes) est tenu à part ;
-`docs/` en contient un résumé.
+[docs/algorithmes.md](docs/algorithmes.md) explique en deux lignes chaque algorithme utilisé.
+
+Sur Mac, l'application n'est pas notariée par Apple (aucun compte payant) : au premier lancement,
+clic droit → Ouvrir, ou Réglages Système → Confidentialité et sécurité → « Ouvrir quand même ».
 
 ## Licence
 
