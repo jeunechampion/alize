@@ -130,12 +130,14 @@ func build(gen: IslandGenerator, seed_v: int, wind_dir: Vector2) -> void:
 		for name in _tree_chunks[key]:
 			var buf: PackedFloat32Array = _tree_chunks[key][name]
 			var mmi := _make_instance(name, buf, true)
+			mmi.name = "%s_%d_%d" % [name, key.x, key.y]   # noms uniques (sinon Godot renomme en @...)
 			mmi.lod_bias = LOD_BIAS
 			if _impostor_mats.has(name):
 				mmi.visibility_range_end = FAR_SWITCH
 				mmi.visibility_range_end_margin = 60.0
 				mmi.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
 				var far := _make_impostor(name, buf)
+				far.name = "%s_%d_%d_loin" % [name, key.x, key.y]
 				far.visibility_range_begin = FAR_SWITCH
 				far.visibility_range_begin_margin = 60.0
 				far.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
