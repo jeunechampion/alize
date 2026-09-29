@@ -58,12 +58,13 @@ static func _ribbon(points: PackedVector3Array, widths: PackedFloat32Array) -> A
 		st.set_uv(Vector2(1.0, v[2] / 8.0))
 		st.add_vertex(v[1])
 	for k in n - 1:
+		# Sens horaire vu de dessus (face avant vers le haut, comme le relief).
 		var a := k * 2
 		st.add_index(a)
-		st.add_index(a + 2)
-		st.add_index(a + 1)
 		st.add_index(a + 1)
 		st.add_index(a + 2)
+		st.add_index(a + 1)
 		st.add_index(a + 3)
+		st.add_index(a + 2)
 	st.generate_tangents()
 	return st.commit()

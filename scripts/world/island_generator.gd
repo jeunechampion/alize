@@ -202,6 +202,7 @@ func _trace_river(src: Vector2, h0: float, rng: RandomNumberGenerator) -> Dictio
 	var step := 6.0
 	var points := PackedVector3Array()
 	var widths := PackedFloat32Array()
+	var surfaces := PackedFloat32Array()   # hauteur d'origine du relief le long du tracé
 	var p := src
 	var level := h0
 	var dir := Vector2.ZERO
@@ -224,27 +225,31 @@ func _trace_river(src: Vector2, h0: float, rng: RandomNumberGenerator) -> Dictio
 		if absf(p.x) > EXTENT * 0.5 - 20.0 or absf(p.y) > EXTENT * 0.5 - 20.0:
 			return {}
 		var hp := height_at(p.x, p.y)
-		level = minf(level, hp) - 0.04 * step
+		# Niveau d'eau strictement décroissant, collé au relief (0,3 m sous la surface d'origine).
+		level = minf(level - 0.001, hp - 0.3)
 		if hp - level > 30.0:
 			return {}   # barré par le relief : ce serait un lac, on abandonne
 		var width := clampf(2.5 + dist * 0.0045, 2.5, 11.0)
 		points.append(Vector3(p.x, level, p.y))
 		widths.append(width)
+		surfaces.append(hp)
 		if hp < SEA_LEVEL + 0.3 or level < SEA_LEVEL + 0.2:
 			break
 	if points.size() < 40 or points[points.size() - 1].y > SEA_LEVEL + 3.0:
 		return {}
-	return {"points": points, "widths": widths}
+	return {"points": points, "widths": widths, "surfaces": surfaces}
 
 
 func _carve_one(river: Dictionary) -> void:
 	var points: PackedVector3Array = river.points
 	var widths: PackedFloat32Array = river.widths
+	var surfaces: PackedFloat32Array = river.surfaces
 	var half := EXTENT * 0.5
 	for k in points.size():
 		var pt := points[k]
 		var w := widths[k]
-		var reach := w * 1.5 + 14.0
+		# Portée du creusement : berges à 30 % jusqu'à rejoindre le relief d'origine (pas de mur).
+		var reach := w * 1.5 + 14.0 + maxf(surfaces[k] - pt.y, 0.0) / 0.30
 		var depth := 1.0 + w * 0.22
 		var ci := int((pt.x + half) / spacing)
 		var cj := int((pt.z + half) / spacing)
@@ -270,6 +275,8 @@ func _carve_one(river: Dictionary) -> void:
 					target = pt.y + (d - w) * 0.30
 				if target < heights[idx]:
 					heights[idx] = target
+				elif d >= w and d <= w * 1.3 and heights[idx] < pt.y + 0.05:
+					heights[idx] = pt.y + 0.05   # petite levée : le bord de l'eau ne flotte pas sur une berge basse
 				var rd := maxf(d - w, 0.0)
 				if rd < river_dist[idx]:
 					river_dist[idx] = rd

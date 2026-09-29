@@ -6,7 +6,8 @@
 shader_type spatial;
 render_mode cull_disabled, depth_draw_opaque, diffuse_burley, specular_schlick_ggx;
 
-uniform sampler2D albedo_atlas : source_color, filter_linear_mipmap, repeat_disable;
+uniform sampler2D albedo_atlas : filter_linear_mipmap, repeat_disable;   // sRGB prémultiplié, lu brut
+uniform bool decode_srgb = true;   // vrai avec Forward+/Mobile (rendu linéaire), faux en Compatibility
 uniform sampler2D normal_atlas : filter_linear_mipmap, repeat_disable;
 uniform float radius = 8.0;       // rayon de la sphère cuite (m, échelle 1)
 uniform float center_y = 6.0;     // hauteur du centre de la sphère (m, échelle 1)
@@ -83,7 +84,12 @@ void fragment() {
 	float lod = 0.5 * log2(max(max(dot(dlx, dlx), dot(dly, dly)), 1.0));
 	ALPHA = cov * (1.0 + lod * alpha_boost);
 	ALPHA_SCISSOR_THRESHOLD = 0.5;
-	ALBEDO = col.rgb / max(cov, 0.001) * v_tint.rgb;
+	// L'atlas est prémultiplié dans l'espace sRGB : on divise par la couverture avant de décoder.
+	vec3 c = clamp(col.rgb / max(cov, 0.001), 0.0, 1.0);
+	if (decode_srgb) {
+		c = mix(c / 12.92, pow((c + vec3(0.055)) / 1.055, vec3(2.4)), step(vec3(0.04045), c));
+	}
+	ALBEDO = c * v_tint.rgb;
 	vec3 n_model = nrm.rgb / max(nrm.a, 0.001) * 2.0 - 1.0;
 	if (dot(n_model, n_model) < 0.05) {
 		n_model = d;

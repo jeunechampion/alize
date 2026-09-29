@@ -75,24 +75,28 @@ void sample_triplanar(int layer, vec3 p, vec3 n, out vec3 alb, out vec3 nrm, out
 	vec3 w = pow(abs(n), vec3(4.0));
 	w /= (w.x + w.y + w.z);
 	float tile = layer_tile[layer];
-	vec3 ax = texture(albedo_layers, vec3(p.zy / tile, float(layer))).rgb;
-	vec3 ay = texture(albedo_layers, vec3(p.xz / tile, float(layer))).rgb;
-	vec3 az = texture(albedo_layers, vec3(p.xy / tile, float(layer))).rgb;
+	// Plans verticaux : v = -y pour que le haut de l'image soit vers le haut (et le vert des normales).
+	vec2 uvx = vec2(p.z, -p.y) / tile;
+	vec2 uvy = p.xz / tile;
+	vec2 uvz = vec2(p.x, -p.y) / tile;
+	vec3 ax = texture(albedo_layers, vec3(uvx, float(layer))).rgb;
+	vec3 ay = texture(albedo_layers, vec3(uvy, float(layer))).rgb;
+	vec3 az = texture(albedo_layers, vec3(uvz, float(layer))).rgb;
 	vec3 t = ax * w.x + ay * w.y + az * w.z;
 	vec3 detail = t / max(layer_mean[layer], vec3(0.01));
 	float luma = dot(detail, vec3(0.3333));
 	alb = layer_tint[layer] * mix(vec3(luma), detail, layer_hue[layer]);
-	vec3 nx = texture(normal_layers, vec3(p.zy / tile, float(layer))).rgb * 2.0 - 1.0;
-	vec3 ny = texture(normal_layers, vec3(p.xz / tile, float(layer))).rgb * 2.0 - 1.0;
-	vec3 nz = texture(normal_layers, vec3(p.xy / tile, float(layer))).rgb * 2.0 - 1.0;
+	vec3 nx = texture(normal_layers, vec3(uvx, float(layer))).rgb * 2.0 - 1.0;
+	vec3 ny = texture(normal_layers, vec3(uvy, float(layer))).rgb * 2.0 - 1.0;
+	vec3 nz = texture(normal_layers, vec3(uvz, float(layer))).rgb * 2.0 - 1.0;
 	// Normales tangentes ramenées dans le monde par plan (approximation « whiteout » simplifiée).
 	vec3 wx = vec3(nx.z * sign(n.x), nx.y, nx.x);
 	vec3 wy = vec3(ny.x, ny.z * sign(n.y), -ny.y);
 	vec3 wz = vec3(nz.x, nz.y, nz.z * sign(n.z));
 	nrm = normalize(wx * w.x + wy * w.y + wz * w.z);
-	arm = texture(arm_layers, vec3(p.zy / tile, float(layer))).rgb * w.x
-		+ texture(arm_layers, vec3(p.xz / tile, float(layer))).rgb * w.y
-		+ texture(arm_layers, vec3(p.xy / tile, float(layer))).rgb * w.z;
+	arm = texture(arm_layers, vec3(uvx, float(layer))).rgb * w.x
+		+ texture(arm_layers, vec3(uvy, float(layer))).rgb * w.y
+		+ texture(arm_layers, vec3(uvz, float(layer))).rgb * w.z;
 }
 
 void fragment() {
@@ -127,6 +131,7 @@ void fragment() {
 
 	// Empilement : végétation -> plage -> mouillé -> fond marin -> roche -> cendres.
 	float w[9];
+	for (int i = 0; i < 9; i++) { w[i] = 0.0; }
 	float veg_g = (1.0 - w_jungle) * (1.0 - w_high);
 	float veg_j = w_jungle * (1.0 - w_high);
 	float veg_h = w_high;
@@ -188,9 +193,9 @@ void fragment() {
 		col = vec3(0.16, 0.52, 0.22);
 		nrm = N;
 	}
+	col = mix(col, col * 0.6, mud_t);   // boue humide plus sombre
 	ALBEDO = col;
 	NORMAL = normalize(mat3(VIEW_MATRIX) * normalize(nrm));
-	col = mix(col, col * 0.6, mud_t);   // boue humide plus sombre
 	ROUGHNESS = mix(clamp(arm.g, 0.5, 1.0), 0.7, max(wet, mud_t) * 0.6); // sable et boue mouillés un peu brillants
 	AO = clamp(arm.r, 0.4, 1.0);
 	AO_LIGHT_AFFECT = 0.25;

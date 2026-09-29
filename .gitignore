@@ -12,3 +12,5 @@ autotest_out/
 Thumbs.db
 # Textures extraites des .glb par Godot (régénérées à l'import)
 assets/sketchfab/*_[0-9]*.png
+# Réglages d'import des atlas d'imposteurs (alpha prémultiplié : pas de correction de bord)
+!assets/impostors/*.import

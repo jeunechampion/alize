@@ -59,6 +59,8 @@ static func _slice(src: Animation, t0: float, t1: float, loop: bool) -> Animatio
 	a.loop_mode = Animation.LOOP_LINEAR if loop else Animation.LOOP_NONE
 	for ti in src.get_track_count():
 		var type := src.track_get_type(ti)
+		if type != Animation.TYPE_POSITION_3D and type != Animation.TYPE_ROTATION_3D and type != Animation.TYPE_SCALE_3D:
+			continue
 		var t := a.add_track(type)
 		a.track_set_path(t, src.track_get_path(ti))
 		a.track_set_interpolation_type(t, src.track_get_interpolation_type(ti))
@@ -137,7 +139,7 @@ func update_pose(dt: float, bird: Node) -> void:
 
 ## Tourne un os autour d'un axe exprimé dans l'espace du squelette, en gardant sa position.
 func _twist(bone_name: String, axis: Vector3, angle: float) -> void:
-	if absf(angle) < 1e-4:
+	if absf(angle) < 1e-4 or not _bone.has(bone_name):
 		return
 	var b: int = _bone[bone_name]
 	var g := skeleton.get_bone_global_pose(b)

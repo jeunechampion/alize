@@ -115,7 +115,12 @@ func _setup_textures() -> void:
 	material.set_shader_parameter("albedo_layers", tex.albedo)
 	material.set_shader_parameter("normal_layers", tex.normal)
 	material.set_shader_parameter("arm_layers", tex.arm)
-	material.set_shader_parameter("layer_mean", tex.mean)
+	# Tableaux de Color (pas de Vector3) : Godot n'applique la conversion « source_color »
+	# (sRGB -> linéaire selon le moteur de rendu) qu'aux éléments de type Color.
+	var means := PackedColorArray()
+	for v in tex.mean:
+		means.append(Color(v.x, v.y, v.z))
+	material.set_shader_parameter("layer_mean", means)
 	# Couleurs cibles (palette, en sRGB -> linéaire) : sable, sable mouillé, herbe, sous-bois,
 	# hauteurs, roche, basalte, fond du lagon, cendres.
 	var palette := [
@@ -123,12 +128,7 @@ func _setup_textures() -> void:
 		Color(0.47, 0.52, 0.28), Color(0.52, 0.48, 0.42), Color(0.27, 0.25, 0.24), Color(0.70, 0.66, 0.50),
 		Color(0.36, 0.32, 0.30),
 	]
-	# Les couleurs passent par des uniformes « source_color » : Godot les convertit (ou non) selon
-	# l'espace de couleur du moteur de rendu, comme les textures.
-	var tints := PackedVector3Array()
-	for c in palette:
-		tints.append(Vector3(c.r, c.g, c.b))
-	material.set_shader_parameter("layer_tint", tints)
+	material.set_shader_parameter("layer_tint", PackedColorArray(palette))
 	# Part de la teinte d'origine conservée (1 : couleur naturelle, 0 : luminance seule + palette).
 	material.set_shader_parameter("layer_hue", PackedFloat32Array([0.8, 0.8, 0.35, 0.45, 0.4, 0.4, 0.5, 0.8, 0.6]))
 	material.set_shader_parameter("layer_tile", PackedFloat32Array([5.0, 5.0, 4.0, 5.0, 8.0, 9.0, 6.0, 7.0, 5.0]))

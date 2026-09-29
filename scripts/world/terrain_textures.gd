@@ -35,8 +35,9 @@ static func build() -> Dictionary:
 			var path := "%s%s/%s_%s_1k.jpg" % [DIR, slug, slug, map]
 			var img := _load_image(path)
 			if img == null:
-				img = Image.create(SIZE, SIZE, true, Image.FORMAT_RGB8)
+				img = Image.create(SIZE, SIZE, false, Image.FORMAT_RGB8)
 				img.fill(Color(0.5, 0.5, 1.0) if map == "nor_gl" else Color(0.5, 0.5, 0.5))
+				img.generate_mipmaps()
 			if map == "Diffuse":
 				result.mean.append(_mean_srgb(img))
 			images.append(img)

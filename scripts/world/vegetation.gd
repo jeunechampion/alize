@@ -78,6 +78,7 @@ func build(gen: IslandGenerator, seed_v: int, wind_dir: Vector2) -> void:
 	_tree_nodes.clear()
 	_under_chunks.clear()
 	_tree_chunks.clear()
+	_last_under_center = Vector2i(1 << 30, 0)
 	tree_count = 0
 	RenderingServer.global_shader_parameter_set("wind_dir", wind_dir)
 	var t0 := Time.get_ticks_msec()
@@ -103,8 +104,10 @@ func build(gen: IslandGenerator, seed_v: int, wind_dir: Vector2) -> void:
 	var group := WorkerThreadPool.add_group_task(_place_row.bind(rows, n), n, -1, true, "Végétation")
 	WorkerThreadPool.wait_for_group_task_completion(group)
 	for j in n:
+		if rows[j] == null:
+			continue
 		var row: Dictionary = rows[j]
-		if row == null or row.is_empty():
+		if row.is_empty():
 			continue
 		for key in row:
 			if not _tree_chunks.has(key):
@@ -179,7 +182,7 @@ func _pick_tree(x: float, z: float, hsh: int) -> String:
 	var wet := _humidity.get_noise_2d(x, z) * 0.5 + 0.5
 	wet = maxf(wet, bank)
 	var ash := _ash_at(x, z)
-	var r := float(hsh & 0xFFFF) / 65535.0
+	var r := float(_hash2(hsh) & 0xFFFF) / 65535.0
 	var gentle := (1.0 - smoothstep(0.3, 0.55, slope)) * (1.0 - bank * 0.6)
 	var beach := 1.0 - smoothstep(9.0, 16.0, h)
 	var low := smoothstep(5.0, 14.0, h) * (1.0 - smoothstep(120.0, 200.0, h))
@@ -214,7 +217,7 @@ func _pick_tree(x: float, z: float, hsh: int) -> String:
 
 
 func _pick_rock(h: float, slope: float, hsh: int) -> String:
-	var r := float((hsh >> 16) & 0xFFFF) / 65535.0
+	var r := float((_hash2(hsh) >> 16) & 0xFFFF) / 65535.0
 	var p := smoothstep(0.25, 0.5, slope) * 0.08 + (1.0 - smoothstep(1.0, 4.0, h)) * 0.06
 	if r < p * 0.6:
 		return "rocher"
@@ -237,7 +240,7 @@ func _pick_under(x: float, z: float, hsh: int) -> String:
 	var wet := _humidity.get_noise_2d(x, z) * 0.5 + 0.5
 	wet = maxf(wet, 1.0 - smoothstep(2.0, 12.0, rd))
 	var ash := _ash_at(x, z)
-	var r := float(hsh & 0xFFFF) / 65535.0
+	var r := float(_hash2(hsh) & 0xFFFF) / 65535.0
 	var beach := 1.0 - smoothstep(6.0, 14.0, h)
 	var low := smoothstep(4.0, 12.0, h) * (1.0 - smoothstep(120.0, 220.0, h))
 	var hill := smoothstep(100.0, 180.0, h) * (1.0 - smoothstep(380.0, 470.0, h))
@@ -279,7 +282,7 @@ func _append_instance(arr: PackedFloat32Array, name: String, x: float, z: float,
 	var s: Dictionary = SPECIES[name]
 	var yaw := float((hsh >> 44) & 0xFFF) / 4095.0 * TAU
 	var scale := 0.82 + 0.36 * float((hsh >> 56) & 0xFF) / 255.0
-	var tint := 0.92 + 0.16 * float((hsh >> 16) & 0xFF) / 255.0
+	var tint := 0.92 + 0.16 * float((_hash2(hsh) >> 20) & 0xFF) / 255.0
 	var phase := float((hsh >> 32) & 0xFF) / 255.0 * TAU
 	var h := generator.height_at(x, z)
 	var basis := Basis(Vector3.UP, yaw).scaled(Vector3.ONE * scale)
@@ -305,6 +308,12 @@ static func _hash32(x: int) -> int:
 	x = (((x >> 16) ^ x) * 0x45d9f3b) & 0xFFFFFFFF
 	x = (((x >> 16) ^ x) * 0x45d9f3b) & 0xFFFFFFFF
 	return ((x >> 16) ^ x) & 0xFFFFFFFF
+
+
+## Second mot indépendant dérivé du hachage (espèce, teinte, rochers) : ne partage aucun bit
+## avec le tremblement de position.
+static func _hash2(hsh: int) -> int:
+	return _hash32(((hsh ^ (hsh >> 32)) & 0xFFFFFFFF) ^ 0x5bd1e995)
 
 
 static func _hash(i: int, j: int, seed_v: int) -> int:
@@ -361,6 +370,7 @@ static func load_impostor_materials() -> Dictionary:
 		mat.set_shader_parameter("center_y", float(meta[name].center_y))
 		mat.set_shader_parameter("n_az", int(meta[name].n_az))
 		mat.set_shader_parameter("n_el", int(meta[name].n_el))
+		mat.set_shader_parameter("decode_srgb", RenderingServer.get_current_rendering_method() != "gl_compatibility")
 		mats[name] = mat
 	return mats
 
@@ -431,6 +441,7 @@ func update_undergrowth(cam_pos: Vector3) -> void:
 func _build_under_chunk(key: Vector2i) -> Node3D:
 	var half := IslandGenerator.EXTENT * 0.5
 	var n := int(UNDER_CHUNK / UNDER_CELL)
+	var cell := UNDER_CHUNK / n   # les cellules couvrent exactement le morceau
 	var lists := {}
 	for j in n:
 		for i in n:
@@ -439,8 +450,8 @@ func _build_under_chunk(key: Vector2i) -> Node3D:
 			var hsh := _hash(gi + 100000, gj + 100000, seed_value ^ 0x5B5B)
 			var jx := float((hsh >> 8) & 0xFFFF) / 65535.0
 			var jz := float((hsh >> 24) & 0xFFFF) / 65535.0
-			var x := -half + key.x * UNDER_CHUNK + (i + jx) * UNDER_CELL
-			var z := -half + key.y * UNDER_CHUNK + (j + jz) * UNDER_CELL
+			var x := -half + key.x * UNDER_CHUNK + (i + jx) * cell
+			var z := -half + key.y * UNDER_CHUNK + (j + jz) * cell
 			if absf(x) > half or absf(z) > half:
 				continue
 			var name := _pick_under(x, z, hsh)
