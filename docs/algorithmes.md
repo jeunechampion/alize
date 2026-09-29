@@ -69,6 +69,22 @@ L'érosion hydraulique (Mei, Decaudin & Hu 2007) viendra avec le module natif, �
 - **Finesse**. Théorique : 12. Mesurée dans le jeu : environ 10 (le trim n'est pas au meilleur
   plané). Vitesse de décrochage : 8,7 m/s.
 
+## La végétation (`scripts/world/tree_builder.gd`, `vegetation.gd`)
+
+- **Colonisation d'espace** (Runions, Lane & Prusinkiewicz 2007). Des points de lumière sont semés
+  dans le volume de la couronne ; à chaque itération, chaque bout de branche pousse vers la moyenne
+  des points qui lui sont les plus proches, et les points atteints disparaissent. Les formes
+  obtenues sont celles des vrais arbres : ramification irrégulière, branches qui contournent.
+- **Modèle des tubes** (Murray 1926, utilisé par Runions). Le rayon d'une branche mère vaut la
+  racine 2,5-ième de la somme des rayons^2,5 de ses filles : le tronc s'épaissit naturellement.
+- **Placement**. Une grille de 13 m tremblée par hachage entier déterministe ; chaque emplacement
+  reçoit un palmier (plage basse et plate), un arbre (collines humides, pas dans les cendres) ou
+  rien, selon l'altitude, la pente et un bruit d'humidité.
+- **Vent** (Sousa, GPU Gems 3 ch. 16). Dans le shader, chaque sommet est déplacé en proportion du
+  carré de sa hauteur, avec une phase propre à chaque arbre ; les feuilles frémissent en plus.
+- **Niveaux de détail**. Près de la caméra le maillage complet (700 à 1 200 triangles), au-delà de
+  650 m une silhouette d'une vingtaine de triangles ; la répartition est refaite toutes les 0,5 s.
+
 ## L'oiseau (`scripts/bird/bird_mesh.gd`)
 
 Corps, tête, bec, queue, ailes en deux segments et pattes sont des primitives assemblées ; le
