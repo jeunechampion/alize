@@ -1,0 +1,74 @@
+name: Fabriquer les versions
+
+# À chaque envoi sur main : tests sans fenêtre, puis versions Mac, Windows et Linux (artefacts).
+# À chaque tag v* : les mêmes versions sont publiées dans une Release téléchargeable par tous.
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  GODOT_VERSION: "4.7.2"
+
+jobs:
+  build:
+    name: Tests et exports
+    runs-on: ubuntu-latest
+    steps:
+      - name: Code
+        uses: actions/checkout@v4
+
+      - name: Godot et modèles d'export
+        run: |
+          set -e
+          curl -sSL -o godot.zip "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -q godot.zip
+          mv "Godot_v${GODOT_VERSION}-stable_linux.x86_64" godot
+          chmod +x godot
+          curl -sSL -o templates.tpz "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          mkdir -p "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
+          unzip -q templates.tpz -d tpl
+          mv tpl/templates/* "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable/"
+          ./godot --version
+
+      - name: Import des ressources
+        run: ./godot --headless --path . --import || true
+
+      - name: Tests sans fenêtre
+        run: ./godot --headless --path . -s tests/run_tests.gd
+
+      - name: Exports
+        run: |
+          set -e
+          mkdir -p export/windows export/linux
+          ./godot --headless --path . --export-release "macOS" export/Alize-macOS.zip
+          ./godot --headless --path . --export-release "Windows Desktop" export/windows/Alize.exe
+          ./godot --headless --path . --export-release "Linux" export/linux/Alize.x86_64
+          (cd export/windows && zip -q -r ../Alize-Windows.zip .)
+          (cd export/linux && zip -q -r ../Alize-Linux.zip .)
+          ls -la export
+
+      - name: Artefacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: alize-versions
+          path: export/*.zip
+          retention-days: 14
+
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: export/*.zip
+          name: Alizé ${{ github.ref_name }}
+          body: |
+            Versions téléchargeables d'Alizé.
+
+            - **Mac** : Alize-macOS.zip — dézipper, puis clic droit sur l'application → Ouvrir. Si macOS refuse, ouvrir Réglages Système → Confidentialité et sécurité → « Ouvrir quand même ».
+            - **Windows** : Alize-Windows.zip — dézipper, lancer Alize.exe (si Windows affiche un avertissement : « Informations complémentaires » → « Exécuter quand même »).
+            - **Linux** : Alize-Linux.zip — dézipper, rendre exécutable, lancer Alize.x86_64.
