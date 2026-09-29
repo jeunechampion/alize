@@ -51,7 +51,11 @@ def download(url, dest, md5=None, force=False):
 
 def fetch_model(slug, res, force):
     files = fetch_json(API + slug)
-    entry = files["gltf"][res]
+    by_res = files["gltf"]
+    if res not in by_res:
+        res = sorted(by_res.keys(), key=lambda k: int(k.rstrip("k")))[0]
+        print("  (résolution indisponible, on prend %s)" % res)
+    entry = by_res[res]["gltf"]
     folder = os.path.join(OUT, "models", slug)
     n = 0
     n += download(entry["url"], os.path.join(folder, os.path.basename(entry["url"])), entry.get("md5"), force)
@@ -68,10 +72,12 @@ def fetch_texture(slug, res, maps, force):
         if m not in files:
             print("  (pas de carte %s pour %s)" % (m, slug))
             continue
-        variants = files[m][res]
+        by_res = files[m]
+        r = res if res in by_res else sorted(by_res.keys(), key=lambda k: int(k.rstrip("k")))[0]
+        variants = by_res[r]
         fmt = "jpg" if "jpg" in variants else ("png" if "png" in variants else next(iter(variants)))
         info = variants[fmt]
-        n += download(info["url"], os.path.join(folder, "%s_%s_%s.%s" % (slug, m, res, fmt)), info.get("md5"), force)
+        n += download(info["url"], os.path.join(folder, "%s_%s_%s.%s" % (slug, m, r, fmt)), info.get("md5"), force)
     return n
 
 
