@@ -1,12 +1,12 @@
 name: Fabriquer les versions
 
-# À chaque envoi sur main : tests sans fenêtre, puis versions Mac, Windows et Linux (artefacts).
-# À chaque tag v* : les mêmes versions sont publiées dans une Release téléchargeable par tous.
+# À chaque envoi sur main : tests sans fenêtre, versions Mac, Windows et Linux, puis publication
+# dans une Release nommée d'après config/version de project.godot (créée si elle n'existe pas,
+# mise à jour sinon). Tout le monde peut la télécharger depuis l'onglet Releases.
 
 on:
   push:
     branches: [main]
-    tags: ['v*']
   workflow_dispatch:
 
 permissions:
@@ -60,12 +60,17 @@ jobs:
           path: export/*.zip
           retention-days: 14
 
+      - name: Numéro de version
+        id: version
+        run: echo "version=$(grep -oP 'config/version="\K[^"]+' project.godot)" >> "$GITHUB_OUTPUT"
+
       - name: Release
-        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: v${{ steps.version.outputs.version }}
+          target_commitish: ${{ github.sha }}
           files: export/*.zip
-          name: Alizé ${{ github.ref_name }}
+          name: Alizé ${{ steps.version.outputs.version }}
           body: |
             Versions téléchargeables d'Alizé.
 
