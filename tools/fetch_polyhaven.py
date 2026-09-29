@@ -88,14 +88,23 @@ def main():
     with open(os.path.join(ROOT, "assets", "manifest.json"), encoding="utf-8") as f:
         manifest = json.load(f)
     total = 0
+    errors = 0
     for slug, opts in manifest.get("models", {}).items():
-        print("modèle", slug)
-        total += fetch_model(slug, opts.get("res", "1k"), args.force)
+        print("modèle", slug, flush=True)
+        try:
+            total += fetch_model(slug, opts.get("res", "1k"), args.force)
+        except Exception as e:  # on continue avec les autres, l'erreur est affichée
+            errors += 1
+            print("  ERREUR %s : %r" % (slug, e), flush=True)
     for slug, opts in manifest.get("textures", {}).items():
-        print("texture", slug)
-        total += fetch_texture(slug, opts.get("res", "1k"), opts.get("maps", ["Diffuse", "nor_gl", "Rough", "AO"]), args.force)
-    print("%d fichier(s) téléchargé(s)." % total)
-    return 0
+        print("texture", slug, flush=True)
+        try:
+            total += fetch_texture(slug, opts.get("res", "1k"), opts.get("maps", ["Diffuse", "nor_gl", "Rough", "AO"]), args.force)
+        except Exception as e:
+            errors += 1
+            print("  ERREUR %s : %r" % (slug, e), flush=True)
+    print("%d fichier(s) téléchargé(s), %d erreur(s)." % (total, errors))
+    return 1 if errors and total == 0 else 0
 
 
 if __name__ == "__main__":

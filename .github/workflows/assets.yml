@@ -19,15 +19,30 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Téléchargement
-        run: python3 tools/fetch_polyhaven.py
-      - name: Enregistrement dans le dépôt
+        run: |
+          python3 -u tools/fetch_polyhaven.py 2>&1 | tee fetch.log
+          echo "exit=${PIPESTATUS[0]}" >> fetch.log
+      - name: Journal (branche ci-logs, lisible depuis l'atelier de Claude)
+        if: always()
         run: |
           git config user.name "alize-assets"
           git config user.email "assets@alize.local"
+          mkdir -p /tmp/cilog && cp fetch.log /tmp/cilog/fetch-assets.log
+          git stash -u -q || true
+          git checkout -q --orphan ci-logs
+          git rm -rfq . || true
+          cp /tmp/cilog/fetch-assets.log .
+          git add fetch-assets.log
+          git commit -qm "journal du téléchargement des ressources"
+          git push -f origin ci-logs
+          git checkout -q main
+          git stash pop -q || true
+      - name: Enregistrement dans le dépôt
+        run: |
           git add assets/polyhaven
           if git diff --cached --quiet; then
             echo "Rien de nouveau."
           else
             git commit -m "Ressources Poly Haven (CC0) : mise à jour depuis le manifeste"
-            git push
+            git push origin main
           fi
